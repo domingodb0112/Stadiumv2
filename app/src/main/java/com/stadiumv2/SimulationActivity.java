@@ -22,8 +22,11 @@ import com.google.mlkit.vision.segmentation.Segmenter;
 import com.google.mlkit.vision.segmentation.selfie.SelfieSegmenterOptions;
 import com.google.android.gms.tasks.Tasks;
 import android.graphics.BitmapFactory;
-import java.nio.ByteBuffer;
 import java.io.File;
+import java.io.FileOutputStream;
+import java.io.IOException;
+import java.io.InputStream;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
 public class SimulationActivity extends AppCompatActivity {
@@ -56,9 +59,9 @@ public class SimulationActivity extends AppCompatActivity {
         Mat userMat = Imgcodecs.imread(mPhotoPath);
         if (userMat.empty()) return;
 
-        // 2. Load Stadium Background (cancha.png)
-        String canchaPath = "C:\\Users\\hecto\\Documents\\Miras Codes\\Stadiumv2\\photos\\cancha.png";
-        Mat stadiumMat = Imgcodecs.imread(canchaPath);
+        // 2. Load Stadium Background (cancha.png) — extraída de assets al filesDir
+        String canchaPath = extractAsset("cancha.png");
+        Mat stadiumMat = (canchaPath != null) ? Imgcodecs.imread(canchaPath) : new Mat();
         if (stadiumMat.empty()) {
             // Fallback or handle error - if stadium is missing, use userMat as is
             stadiumMat = userMat.clone();
@@ -138,6 +141,7 @@ public class SimulationActivity extends AppCompatActivity {
                 if (mProgress != null) mProgress.setProgress(6000);
                 Intent intent = new Intent(SimulationActivity.this, FinalActivity.class);
                 intent.putExtra(FinalActivity.EXTRA_PHOTO_PATH, mPhotoPath);
+                intent.putStringArrayListExtra(PlayerSelectionActivity.EXTRA_SELECTED_VIDEOS, mVideos);
                 startActivity(intent);
                 finish();
             }
@@ -146,5 +150,24 @@ public class SimulationActivity extends AppCompatActivity {
 
     private void applyFullscreen() {
         getWindow().getDecorView().setSystemUiVisibility(View.SYSTEM_UI_FLAG_IMMERSIVE_STICKY | View.SYSTEM_UI_FLAG_FULLSCREEN | View.SYSTEM_UI_FLAG_HIDE_NAVIGATION | View.SYSTEM_UI_FLAG_LAYOUT_STABLE);
+    }
+
+    /**
+     * Extrae un archivo de assets al filesDir interno para que OpenCV pueda leerlo.
+     * Retorna la ruta en disco, o null si falla.
+     */
+    private String extractAsset(String filename) {
+        File dest = new File(getFilesDir(), filename);
+        if (dest.exists() && dest.length() > 0) return dest.getAbsolutePath();
+        try (InputStream in = getAssets().open(filename);
+             FileOutputStream out = new FileOutputStream(dest)) {
+            byte[] buf = new byte[65536];
+            int n;
+            while ((n = in.read(buf)) > 0) out.write(buf, 0, n);
+            return dest.getAbsolutePath();
+        } catch (IOException e) {
+            android.util.Log.e("SimulationActivity", "No se pudo extraer asset: " + filename, e);
+            return null;
+        }
     }
 }

@@ -14,11 +14,19 @@
         android:scaleType="fitCenter"
         android:contentDescription="Foto final" />
 
-    <!-- Overlay oscuro semitransparente encima de la foto -->
+    <!-- Gradiente superior para legibilidad del texto (no tapa la animación) -->
     <View
         android:layout_width="match_parent"
-        android:layout_height="match_parent"
-        android:background="#99000000" />
+        android:layout_height="220dp"
+        android:layout_gravity="top"
+        android:background="@drawable/gradient_top" />
+
+    <!-- Gradiente inferior para legibilidad del QR y botón -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="320dp"
+        android:layout_gravity="bottom"
+        android:background="@drawable/gradient_bottom" />
 
     <!-- Bloque central: icono + mensaje -->
     <LinearLayout

@@ -34,5 +34,6 @@ public class NativeModule {
     public static native void    setOverlayTransformV2(int slot, int x, int y, int w, int h);
     public static native void    resetVideoV2(int slot);
     public static native void    setLoopingV2(int slot, boolean looping);
+    public static native boolean isVideoFinishedV2(int slot);
     private static native boolean savePhotoNative(long matAddr, String path);
 }

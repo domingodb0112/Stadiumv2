@@ -63,6 +63,12 @@ Java_com_stadiumv2_NativeModule_resetVideoV2(JNIEnv*, jclass, jint slot) {
     if (slot >= 0 && slot <= 1) g_players[slot].finished = false;
 }
 
+extern "C" JNIEXPORT jboolean JNICALL
+Java_com_stadiumv2_NativeModule_isVideoFinishedV2(JNIEnv*, jclass, jint slot) {
+    if (slot < 0 || slot > 1) return JNI_TRUE;
+    return g_players[slot].finished ? JNI_TRUE : JNI_FALSE;
+}
+
 extern "C" JNIEXPORT void JNICALL
 Java_com_stadiumv2_NativeModule_setLoopingV2(JNIEnv*, jclass, jint slot, jboolean lp) {
     if (slot >= 0 && slot <= 1) g_players[slot].looping = lp;

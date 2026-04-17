@@ -45,12 +45,10 @@ android {
         }
     }
 
-    // Incluir la carpeta videos/ del proyecto como assets del APK.
-    // Los archivos gilbertoMora.mov y raulRangel.mov quedan accesibles
-    // via getAssets().open("gilbertoMora.mov") sin moverlos de lugar.
+    // Los videos ya están en src/main/assets/ — una sola fuente de assets.
     sourceSets {
         main {
-            assets.srcDirs = ['src/main/assets', '../videos']
+            assets.srcDirs = ['src/main/assets']
         }
     }
 

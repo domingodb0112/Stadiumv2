@@ -34,7 +34,7 @@ public class PlayerSelectionActivity extends AppCompatActivity {
 
         RecyclerView rv = findViewById(R.id.rv_players);
         rv.setLayoutManager(new GridLayoutManager(this, 3));
-        rv.setAdapter(new PlayerAdapter(mPlayers, this::onSelectionChanged));
+        rv.setAdapter(new PlayerAdapter(mPlayers, this::onSelectionChanged, this));
 
         mBtnContinue.setOnClickListener(v -> launchCamera());
     }
