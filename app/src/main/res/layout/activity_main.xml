@@ -1,0 +1,99 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <com.stadiumv2.FullScreenCameraView
+        android:id="@+id/camera_view"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent" />
+
+    <!-- Botón Regresar -->
+    <ImageButton
+        android:id="@+id/btn_back_to_selection"
+        android:layout_width="56dp"
+        android:layout_height="56dp"
+        android:layout_margin="24dp"
+        android:background="?attr/selectableItemBackgroundBorderless"
+        android:src="@android:drawable/ic_menu_revert"
+        android:scaleType="centerInside"
+        android:padding="8dp"
+        app:tint="#FFFFFFFF"
+        android:contentDescription="Regresar"
+        android:visibility="gone" />
+
+    <!-- Cuenta regresiva -->
+    <TextView
+        android:id="@+id/tv_countdown"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:text=""
+        android:textColor="#FFFFFFFF"
+        android:textSize="180sp"
+        android:fontFamily="sans-serif-black"
+        android:shadowColor="#AA000000"
+        android:shadowDx="4"
+        android:shadowDy="4"
+        android:shadowRadius="8"
+        android:visibility="gone" />
+
+    <!-- Botón de captura -->
+    <com.google.android.material.floatingactionbutton.FloatingActionButton
+        android:id="@+id/btn_capture"
+        android:layout_width="64dp"
+        android:layout_height="64dp"
+        android:layout_gravity="bottom|center_horizontal"
+        android:layout_marginBottom="40dp"
+        android:src="@android:drawable/ic_menu_camera"
+        app:fabCustomSize="64dp"
+        android:backgroundTint="#FFFFFFFF"
+        app:tint="#FF000000"
+        app:elevation="0dp"
+        android:contentDescription="Tomar foto" />
+
+    <!-- Overlay de inicio: "TOCA PARA COMENZAR" -->
+    <LinearLayout
+        android:id="@+id/v_start_overlay"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#FF000000"
+        android:gravity="center"
+        android:orientation="vertical"
+        android:clickable="true"
+        android:focusable="true">
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="STADIUM AR"
+            android:textColor="#FFFFFFFF"
+            android:textSize="36sp"
+            android:fontFamily="sans-serif-black"
+            android:letterSpacing="0.1" />
+
+        <TextView
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="8dp"
+            android:text="Vive la experiencia con tus ídolos"
+            android:textColor="#88FFFFFF"
+            android:textSize="15sp" />
+
+        <android.widget.Button
+            android:id="@+id/btn_start_experience"
+            android:layout_width="220dp"
+            android:layout_height="64dp"
+            android:layout_marginTop="48dp"
+            android:text="TOCA PARA COMENZAR"
+            android:textColor="#000000"
+            android:backgroundTint="#FFFFFFFF"
+            android:textSize="16sp"
+            android:fontFamily="sans-serif-black" />
+
+    </LinearLayout>
+
+</FrameLayout>

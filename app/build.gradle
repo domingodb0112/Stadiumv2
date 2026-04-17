@@ -1,0 +1,85 @@
+plugins {
+    id 'com.android.application'
+}
+
+android {
+    compileSdk 34
+    namespace  'com.stadiumv2'
+
+    defaultConfig {
+        applicationId "com.stadiumv2"
+        minSdk      26       // Android 8.0 — mínimo para NDK estable
+        targetSdk   28       // Android 9 — hardware industrial objetivo
+        versionCode 1
+        versionName "1.0-etapa1"
+
+        // ── CMake: ETAPA 2 (OpenCV integrado) ─────────────────────────
+        externalNativeBuild {
+            cmake {
+                cppFlags "-std=c++17 -frtti -fexceptions"
+                abiFilters "arm64-v8a", "armeabi-v7a"
+                // Ruta al jni de OpenCV para que find_package() lo encuentre
+                arguments "-DOpenCV_DIR=C:/Users/hecto/Downloads/opencv-4.12.0-android-sdk/OpenCV-android-sdk/sdk/native/jni",
+                          "-DANDROID_STL=c++_shared"
+            }
+        }
+    }
+
+    buildTypes {
+        release {
+            minifyEnabled   false
+            shrinkResources false   // No comprimir: las .so deben quedar intactas
+            proguardFiles getDefaultProguardFile('proguard-android-optimize.txt'),
+                          'proguard-rules.pro'
+        }
+        debug {
+            jniDebuggable true      // Permite depurar código C++ con LLDB
+        }
+    }
+
+    // ── Enlace al CMakeLists.txt ──────────────────────────────────────────
+    externalNativeBuild {
+        cmake {
+            path "src/main/cpp/CMakeLists.txt"
+            // Sin version fija: usa la versión de CMake instalada en SDK Manager
+        }
+    }
+
+    // Incluir la carpeta videos/ del proyecto como assets del APK.
+    // Los archivos gilbertoMora.mov y raulRangel.mov quedan accesibles
+    // via getAssets().open("gilbertoMora.mov") sin moverlos de lugar.
+    sourceSets {
+        main {
+            assets.srcDirs = ['src/main/assets', '../videos']
+        }
+    }
+
+    compileOptions {
+        // VERSION_17 requerido por el módulo OpenCV 4.12
+        sourceCompatibility JavaVersion.VERSION_17
+        targetCompatibility JavaVersion.VERSION_17
+    }
+
+    packaging {
+        jniLibs {
+            pickFirsts += [
+                "lib/arm64-v8a/libc++_shared.so",
+                "lib/armeabi-v7a/libc++_shared.so"
+            ]
+        }
+    }
+}
+
+dependencies {
+    implementation 'androidx.appcompat:appcompat:1.6.1'
+    implementation 'com.google.android.material:material:1.9.0'
+    implementation project(':opencv')
+
+    // ── Extras: Red y QR ──────────────────────────────────────────────────
+    implementation 'com.squareup.okhttp3:okhttp:4.10.0'
+    implementation 'com.google.zxing:core:3.5.1'
+
+    // Face detection & Selfie Segmentation bundled
+    implementation 'com.google.mlkit:face-detection:16.1.7'
+    implementation 'com.google.mlkit:segmentation-selfie:16.0.0-beta6'
+}

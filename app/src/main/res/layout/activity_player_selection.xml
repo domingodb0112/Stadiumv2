@@ -1,0 +1,66 @@
+<?xml version="1.0" encoding="utf-8"?>
+<LinearLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:orientation="vertical"
+    android:background="#FF000000"
+    android:gravity="center_horizontal">
+
+    <!-- Header -->
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="48dp"
+        android:text="ELIGE TUS JUGADORES"
+        android:textColor="#FFFFFFFF"
+        android:textSize="22sp"
+        android:fontFamily="sans-serif-black"
+        android:letterSpacing="0.08" />
+
+    <TextView
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="6dp"
+        android:text="Selecciona los jugadores que aparecerán en tu foto"
+        android:textColor="#88FFFFFF"
+        android:textSize="13sp"
+        android:gravity="center"
+        android:paddingHorizontal="24dp" />
+
+    <TextView
+        android:id="@+id/tv_selected_count"
+        android:layout_width="wrap_content"
+        android:layout_height="wrap_content"
+        android:layout_marginTop="12dp"
+        android:text="0 seleccionados"
+        android:textColor="#FF4CAF50"
+        android:textSize="14sp"
+        android:fontFamily="sans-serif-medium" />
+
+    <!-- Grid de jugadores -->
+    <androidx.recyclerview.widget.RecyclerView
+        android:id="@+id/rv_players"
+        android:layout_width="match_parent"
+        android:layout_height="0dp"
+        android:layout_weight="1"
+        android:layout_marginTop="16dp"
+        android:paddingHorizontal="8dp"
+        android:clipToPadding="false" />
+
+    <!-- Botón Continuar -->
+    <com.google.android.material.button.MaterialButton
+        android:id="@+id/btn_continue"
+        android:layout_width="240dp"
+        android:layout_height="56dp"
+        android:layout_marginBottom="40dp"
+        android:layout_marginTop="12dp"
+        android:text="CONTINUAR"
+        android:textSize="16sp"
+        android:textColor="#FF000000"
+        android:enabled="false"
+        android:backgroundTint="#FF4CAF50"
+        android:fontFamily="sans-serif-black"
+        android:letterSpacing="0.08" />
+
+</LinearLayout>

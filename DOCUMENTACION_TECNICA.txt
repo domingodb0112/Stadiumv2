@@ -1,0 +1,111 @@
+================================================================================
+DOCUMENTACIÓN TÉCNICA — STADIUM V2 PHOTO BOOTH AR
+================================================================================
+
+Este documento detalla el funcionamiento de la nueva arquitectura modular de la 
+aplicación, diseñada para mantener archivos cortos (<120 líneas) y facilitar el 
+mantenimiento futuro.
+
+--------------------------------------------------------------------------------
+1. COMPONENTES JAVA (app/src/main/java/com/stadiumv2/)
+--------------------------------------------------------------------------------
+
+[MainActivity.java]
+- Función: Actividad principal y punto de entrada.
+- Responsabilidades:
+  * Gestionar el ciclo de vida de la cámara (onResume/onPause).
+  * Controlar el flujo principal: Pantalla de inicio -> Contador -> Captura.
+  * Delegar la configuración de cámara a CameraHelper y videos a VideoManager.
+  * Procesar cada frame de cámara mediante NativeModule.processFrame().
+
+[FinalActivity.java]
+- Función: Pantalla de éxito post-captura.
+- Responsabilidades:
+  * Mostrar la foto guardada en disco.
+  * Iniciar la subida de la foto mediante NetworkClient.
+  * Ejecutar las animaciones de celebración usando UIAnimations.
+  * Mostrar el código QR una vez que el servidor responde.
+
+[NativeModule.java] (NUEVO)
+- Función: Puente central de comunicación con C++ (JNI).
+- Responsabilidades:
+  * Cargar las librerías nativas (c++_shared, opencv_java4, native-lib).
+  * Declarar todos los métodos 'native'.
+  * Ofrecer métodos estáticos simplificados para procesar frames y guardar fotos.
+
+[CameraHelper.java] (NUEVO)
+- Función: Utilidades de cámara y permisos.
+- Responsabilidades:
+  * Verificar y solicitar permisos de cámara (Manifest.permission.CAMERA).
+  * Enumerar las cámaras del dispositivo y seleccionar preferentemente la frontal.
+  * Configurar el índice de cámara en la vista de OpenCV.
+
+[VideoManager.java] (NUEVO)
+- Función: Gestión de archivos de video AR.
+- Responsabilidades:
+  * Localizar los videos .mov en 3 rutas (Almacenamiento externo, Interno, Assets).
+  * Copiar de Assets a memoria interna si no existen.
+  * Iniciar los hilos de reproducción de video en el motor nativo.
+
+[UIAnimations.java] (NUEVO)
+- Función: Motor de animaciones de interfaz.
+- Responsabilidades:
+  * Orquestar la animación de entrada de la palomita (Checkmark), Título y Subtítulo.
+  * Utiliza AnimatorSet para encadenar efectos de escala, opacidad y traslación.
+
+[NetworkClient.java]
+- Función: Comunicación con el servidor.
+- Responsabilidades:
+  * Subir la foto final mediante una petición Multipart POST.
+  * Recibir la respuesta JSON y extraer la cadena Base64 del QR.
+  * Decodificar Base64 a un objeto Bitmap de Android.
+
+[FullScreenCameraView.java]
+- Función: Vista personalizada de cámara.
+- Responsabilidades:
+  * Forzar que la previsualización de cámara llene toda la pantalla.
+  * Aplicar un escalado tipo "cover" para evitar barras negras, recortando lo sobrante.
+
+
+--------------------------------------------------------------------------------
+2. COMPONENTES NATIVOS C++ (app/src/main/cpp/)
+--------------------------------------------------------------------------------
+
+[native-lib.cpp]
+- Función: Punto de entrada JNI.
+- Responsabilidades:
+  * Implementar las funciones declaradas en NativeModule.java.
+  * Actuar como pasarela (bridge) hacia los módulos específicos de video e imagen.
+
+[video_engine.hpp / video_engine.cpp] (NUEVO)
+- Función: Motor de reproducción de video MOV.
+- Responsabilidades:
+  * Parsear la estructura de átomos de archivos QuickTime (MOV) para extraer frames PNG.
+  * Gestionar VideoPlayer: hilos independientes que descodifican frames en segundo plano.
+  * Controlar la velocidad de reproducción, bucles y estados de finalización.
+
+[image_proc.hpp / image_proc.cpp] (NUEVO)
+- Función: Procesamiento de imágenes y blending.
+- Responsabilidades:
+  * blendPixels(): Algoritmo optimizado de Alpha Blending para combinar el frame de 
+    la cámara con el video AR.
+  * applyOverlay(): Escalar el frame del video a las dimensiones de la cámara y 
+    posicionarlo según la configuración (x, y, w, h).
+
+--------------------------------------------------------------------------------
+3. FLUJO DE DATOS
+--------------------------------------------------------------------------------
+
+1. Android (MainActivity) recibe un frame de cámara desde OpenCV.
+2. Android lo envía a C++ a través de NativeModule.processFrame().
+3. C++ (native-lib) llama a image_proc para superponer los frames actuales de 
+   cada video activo.
+4. C++ (video_engine) actualiza los frames de video de forma asíncrona en sus 
+   propios threads para no bloquear la cámara.
+5. Android recibe el frame final compuesto y lo dibuja en pantalla.
+6. Al capturar, Android instruye a C++ para guardar el frame resultante en un 
+   archivo JPEG de alta calidad.
+
+================================================================================
+FIN DE DOCUMENTACIÓN
+================================================================================

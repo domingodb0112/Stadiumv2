@@ -1,0 +1,12 @@
+<?xml version="1.0" encoding="utf-8"?>
+<!-- Rutas expuestas por FileProvider para compartir fotos en Android 9 -->
+<paths xmlns:android="http://schemas.android.com/apk/res/android">
+    <!-- Almacenamiento interno: getFilesDir() -->
+    <files-path
+        name="internal_photos"
+        path="." />
+    <!-- Almacenamiento externo privado: getExternalFilesDir() -->
+    <external-files-path
+        name="external_photos"
+        path="Pictures/" />
+</paths>

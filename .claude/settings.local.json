@@ -1,0 +1,35 @@
+{
+  "permissions": {
+    "allow": [
+      "Bash(cp C:/Users/hecto/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so 'C:/Users/hecto/Documents/Miras Codes/Stadiumv2/app/src/main/jniLibs/arm64-v8a/libc++_shared.so')",
+      "Bash(cp C:/Users/hecto/AppData/Local/Android/Sdk/ndk/25.1.8937393/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so 'C:/Users/hecto/Documents/Miras Codes/Stadiumv2/app/src/main/jniLibs/armeabi-v7a/libc++_shared.so')",
+      "Bash(cp C:/Users/hecto/AppData/Local/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/aarch64-linux-android/libc++_shared.so 'C:/Users/hecto/Documents/Miras Codes/Stadiumv2/app/src/main/jniLibs/arm64-v8a/libc++_shared.so')",
+      "Bash(cp C:/Users/hecto/AppData/Local/Android/Sdk/ndk/26.1.10909125/toolchains/llvm/prebuilt/windows-x86_64/sysroot/usr/lib/arm-linux-androideabi/libc++_shared.so 'C:/Users/hecto/Documents/Miras Codes/Stadiumv2/app/src/main/jniLibs/armeabi-v7a/libc++_shared.so')",
+      "Bash(ffprobe -v quiet -show_streams -print_format json \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/videos/gilbertoMora.mov\")",
+      "Bash(python3 -c \"import sys,json; d=json.load\\(sys.stdin\\); [print\\(s.get\\('codec_name'\\), s.get\\('pix_fmt'\\), s.get\\('codec_tag_string'\\)\\) for s in d['streams']]\")",
+      "Bash($ADB devices *)",
+      "Bash($ADB push *)",
+      "Bash(C:/Users/hecto/AppData/Local/Android/Sdk/platform-tools/adb.exe shell *)",
+      "Bash(cmd /c 'C:\\\\Users\\\\hecto\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe shell mkdir -p /sdcard/Android/data/com.stadiumv2/files')",
+      "Bash(cmd /c 'C:\\\\Users\\\\hecto\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe shell ls /sdcard/Android/data/com.stadiumv2/')",
+      "Bash(MSYS_NO_PATHCONV=1 $ADB shell *)",
+      "Bash('C:\\\\Users\\\\hecto\\\\AppData\\\\Local\\\\Android\\\\Sdk\\\\platform-tools\\\\adb.exe' push *)",
+      "Bash(./gradlew assembleDebug)",
+      "Bash(cmd.exe *)",
+      "Bash(powershell.exe *)",
+      "Bash(ls \"C:\\\\Users\\\\hecto\\\\Documents\\\\Miras Codes\\\\Stadiumv2\"/*.bat)",
+      "Bash(ls \"C:\\\\Users\\\\hecto\\\\Documents\\\\Miras Codes\\\\Stadiumv2\"/*.sh)",
+      "Bash(ls \"C:\\\\Users\\\\hecto\\\\Documents\\\\Miras Codes\\\\Stadiumv2\"/gradlew*)",
+      "Bash(where gradle *)",
+      "Bash(where java *)",
+      "Bash(dir \"C:\\\\Users\\\\hecto\\\\Documents\\\\Miras Codes\\\\Stadiumv2\")",
+      "Bash(gradle --version)",
+      "Bash(cp \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/photos/edsonAlvarezGm.png\" \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/app/src/main/res/drawable/player_edson.png\")",
+      "Bash(cp \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/photos/gilbertoMoraGm.png\" \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/app/src/main/res/drawable/player_gilberto.png\")",
+      "Bash(cp \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/photos/jorgeSanchezGm.png\" \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/app/src/main/res/drawable/player_jorge.png\")",
+      "Bash(cp \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/photos/mateoChavezGm.png\" \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/app/src/main/res/drawable/player_mateo.png\")",
+      "Bash(cp \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/photos/raulJimenezGm.png\" \"C:/Users/hecto/Documents/Miras Codes/Stadiumv2/app/src/main/res/drawable/player_raul_j.png\")",
+      "Bash(find C:\\\\Users\\\\hecto\\\\Documents\\\\Miras Codes\\\\Stadiumv2 *)"
+    ]
+  }
+}

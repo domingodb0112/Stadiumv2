@@ -1,0 +1,21 @@
+# Android Build
+/build
+/*/build
+app/build/
+.gradle/
+.idea/
+*.apk
+*.iml
+local.properties
+.DS_Store
+
+# Android Studio Intermediates
+.externalNativeBuild
+.cxx
+captures/
+
+# Native Libs (optional, but often ignored if generated)
+# app/src/main/jniLibs/ (Keep this if you manually put libs there)
+
+# Large Assets (Handled by LFS in .gitattributes)
+# videos/

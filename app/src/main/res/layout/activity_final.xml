@@ -1,0 +1,114 @@
+<?xml version="1.0" encoding="utf-8"?>
+<FrameLayout
+    xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
+    android:layout_width="match_parent"
+    android:layout_height="match_parent"
+    android:background="#000000">
+
+    <!-- Foto capturada a pantalla completa -->
+    <ImageView
+        android:id="@+id/iv_final_photo"
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:scaleType="fitCenter"
+        android:contentDescription="Foto final" />
+
+    <!-- Overlay oscuro semitransparente encima de la foto -->
+    <View
+        android:layout_width="match_parent"
+        android:layout_height="match_parent"
+        android:background="#99000000" />
+
+    <!-- Bloque central: icono + mensaje -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="center"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:paddingHorizontal="48dp">
+
+        <!-- Palomita de éxito -->
+        <TextView
+            android:id="@+id/tv_checkmark"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:text="✓"
+            android:textColor="#FF4CAF50"
+            android:textSize="120sp"
+            android:fontFamily="sans-serif-black"
+            android:alpha="0" />
+
+        <!-- Título -->
+        <TextView
+            android:id="@+id/tv_success_title"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="16dp"
+            android:text="¡Foto lista!"
+            android:textColor="#FFFFFFFF"
+            android:textSize="48sp"
+            android:fontFamily="sans-serif-black"
+            android:gravity="center"
+            android:alpha="0" />
+
+        <!-- Subtítulo -->
+        <TextView
+            android:id="@+id/tv_success_sub"
+            android:layout_width="wrap_content"
+            android:layout_height="wrap_content"
+            android:layout_marginTop="12dp"
+            android:text="Revisa tu foto en la aplicación"
+            android:textColor="#CCFFFFFF"
+            android:textSize="22sp"
+            android:gravity="center"
+            android:alpha="0" />
+
+        <!-- Código QR (aparece después de la subida) -->
+        <FrameLayout
+            android:id="@+id/container_qr"
+            android:layout_width="240dp"
+            android:layout_height="240dp"
+            android:layout_marginTop="24dp"
+            android:background="#FFFFFF"
+            android:padding="8dp"
+            android:visibility="gone">
+
+            <ImageView
+                android:id="@+id/iv_qr_code"
+                android:layout_width="match_parent"
+                android:layout_height="match_parent"
+                android:scaleType="fitCenter"
+                android:contentDescription="Código QR" />
+        </FrameLayout>
+
+    </LinearLayout>
+
+    <!-- Botón Volver al inicio (Permanente) -->
+    <LinearLayout
+        android:layout_width="match_parent"
+        android:layout_height="wrap_content"
+        android:layout_gravity="bottom|center_horizontal"
+        android:orientation="vertical"
+        android:gravity="center"
+        android:layout_marginBottom="40dp"
+        android:paddingHorizontal="48dp">
+
+        <com.google.android.material.button.MaterialButton
+            android:id="@+id/btn_back_to_home"
+            android:layout_width="280dp"
+            android:layout_height="72dp"
+            android:text="VOLVER AL INICIO"
+            android:textColor="#FFFFFF"
+            android:textSize="20sp"
+            android:fontFamily="sans-serif-black"
+            android:backgroundTint="#FF4CAF50"
+            style="@style/Widget.MaterialComponents.Button"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:cornerRadius="36dp" />
+
+    </LinearLayout>
+
+</FrameLayout>
