@@ -19,18 +19,26 @@ from engine.video_overlay import VideoOverlayEngine
 class CameraPreviewScreen(BaseScreen):
     """Pantalla de cámara en vivo con carga asíncrona para evitar lag."""
 
-    def __init__(self, app, players, **kwargs):
+    def __init__(self, app, players, cap=None, **kwargs):
         super().__init__(app, **kwargs)
         self._players        = players
-        self._cap            = None
+        self._cap            = cap # Usar cámara inyectada si existe
         self._running        = False
         self._countdown_left = 0
         self._counting       = False
         self._photo_frame    = None
         self._capture_pending = False
+        # Los jugadores ya están cargados y pausados desde la pantalla de carga.
+        # No hace falta activarlos/desactivarlos, solo darles 'Play'.
 
         self._build_ui()
         self._start_camera()
+        
+        # Iniciar reproducción tras 2 segundos (Antes eran 3)
+        QTimer.singleShot(2000, self._start_playback)
+        
+    def _start_playback(self):
+        VideoOverlayEngine.set_paused(False)
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
@@ -108,41 +116,56 @@ class CameraPreviewScreen(BaseScreen):
     # ── Camera loop ───────────────────────────────────────────────────────────
 
     def _start_camera(self):
-        """Inicia la cámara y los videos en un hilo de fondo para evitar congelar la UI."""
+        """Inicia la cámara y los videos en un hilo de fondo."""
         self._running = True
         self._timer = QTimer()
         self._timer.timeout.connect(self._capture_frame)
         self._timer.start(33)   # ~30 FPS
 
-        # Lanzar inicialización pesada en segundo plano
-        threading.Thread(target=self._init_hardware_async, daemon=True).start()
+        if self._cap is None:
+            # Solo si no se inyectó, abrimos en segundo plano
+            threading.Thread(target=self._init_hardware_async, daemon=True).start()
+        else:
+            # Si ya tenemos cámara, los videos ya están cargados (por LoadingScreen)
+            # Solo nos aseguramos de que el motor sepa que estamos en preview
+            pass
 
     def _init_hardware_async(self):
-        """Apertura real de cámara y carga de videos (corre en background)."""
+        """Apertura fallback de cámara."""
         try:
-            # 1. Abrir Cámara
-            cap = cv2.VideoCapture(0)
-            if cap.isOpened():
-                cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1080)
-                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
-                self._cap = cap
-                print("[Camera] Hardware ready")
-            
-            # 2. Iniciar Overlays
-            VideoOverlayEngine.start_experience(self._players, WIN_W, WIN_H)
+            if self._cap is None:
+                self._cap = cv2.VideoCapture(0)
+            VideoOverlayEngine.start_experience(self._players, 720, 1280)
         except Exception as e:
             print(f"[Camera] Async init error: {e}")
 
     def _capture_frame(self):
         if not self._running or self._cap is None or not self._cap.isOpened():
-            # Si la cámara aún no abre o falló, mostrar fondo negro
             return
 
         ret, frame = self._cap.read()
         if not ret:
             return
 
-        # INTERNAL SCALING: Renderizamos a 720p para ganar 30+ FPS.
+        # ── CENTER CROP 9:16 (1080x1920) ──────────────────────────────────
+        # La cámara suele dar 16:9 (horiz). Recortamos el centro para vertical.
+        h, w = frame.shape[:2]
+        target_aspect = 9 / 16
+        current_aspect = w / h
+
+        if current_aspect > target_aspect:
+            # Demasiado ancho (típico), recortamos lados
+            new_w = int(h * target_aspect)
+            x_offset = (w - new_w) // 2
+            frame = frame[:, x_offset : x_offset + new_w]
+        elif current_aspect < target_aspect:
+            # Demasiado alto, recortamos arriba/abajo
+            new_h = int(w / target_aspect)
+            y_offset = (h - new_h) // 2
+            frame = frame[y_offset : y_offset + new_h, :]
+
+        # Ya tenemos proporción 9:16 real.
+        # INTERNAL SCALING a 720x1280 para FPS estables.
         PREVIEW_W = 720
         PREVIEW_H = 1280
         
@@ -159,6 +182,7 @@ class CameraPreviewScreen(BaseScreen):
             self._photo_frame = cv2.resize(frame, (REF_W, REF_H))
             preview_frame = VideoOverlayEngine.apply_all(preview_frame)
         else:
+            # Aplicar overlays (estarán pausados o en play según el timer)
             preview_frame = VideoOverlayEngine.apply_all(preview_frame)
 
         self._update_canvas(preview_frame)

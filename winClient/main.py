@@ -83,10 +83,10 @@ class StadiumApp(QMainWindow):
         self.stacked.addWidget(screen)
         self.stacked.setCurrentWidget(screen)
 
-    def show_camera(self, players):
-        """Mostrar pantalla de cámara."""
+    def show_camera(self, players, cap=None):
+        """Mostrar pantalla de cámara. Opcionalmente acepta un 'cap' ya abierto."""
         self._clear_stacked()
-        screen = CameraPreviewScreen(self, players)
+        screen = CameraPreviewScreen(self, players, cap=cap)
         self.stacked.addWidget(screen)
         self.stacked.setCurrentWidget(screen)
 

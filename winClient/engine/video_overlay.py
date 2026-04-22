@@ -22,6 +22,7 @@ class VideoPlayer:
         self.ready         = False
         self.finished      = False
         self.looping       = False
+        self.paused        = False # Nuevo: Control de reproducción
         self._thread: threading.Thread | None = None
         # (x, y, w, h) en coordenadas de pantalla
         self.config        = (0, 0, 540, 960)
@@ -65,6 +66,11 @@ class VideoPlayer:
         try:
             with open(path, 'rb') as f:
                 while self.running:
+                    if self.paused and self.ready:
+                        # Si está pausado y ya tiene el primer frame, esperar
+                        time.sleep(0.05)
+                        continue
+
                     t0 = time.perf_counter()
 
                     offset, size = frames[idx]
@@ -131,7 +137,13 @@ class VideoOverlayEngine:
     _players: list[VideoPlayer] = [VideoPlayer() for _ in range(4)]
 
     @classmethod
-    def start_experience(cls, player_list, screen_w: int, screen_h: int):
+    def set_paused(cls, paused: bool):
+        """Pausa o reanuda todos los jugadores."""
+        for vp in cls._players:
+            vp.paused = paused
+
+    @classmethod
+    def start_experience(cls, player_list, screen_w: int, screen_h: int, paused=False):
         """
         player_list: lista de objetos Player (models.player_roster)
         screen_w/h : dimensiones reales de la pantalla de renderizado
@@ -147,6 +159,7 @@ class VideoOverlayEngine:
             w = int(player.w * screen_w / REF_W)
             h = int(player.h * screen_h / REF_H)
             vp.config = (x, y, w, h)
+            vp.paused = paused
 
             video_path = str(player.video_path)
             vp.start(video_path, looping=False)
