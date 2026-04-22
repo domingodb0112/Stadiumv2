@@ -3,6 +3,8 @@ Stadium Photo Booth - Windows Client (PyQt5)
 Main app controller
 """
 import sys
+import threading
+import cv2
 from pathlib import Path
 
 # Agregar el directorio actual al path para que las importaciones de 'screens' funcionen
@@ -16,6 +18,8 @@ from PyQt5.QtCore import Qt, QTimer, QRect
 from PyQt5.QtGui import QFont, QPainter, QColor, QPen
 
 from config import WIN_W, WIN_H, BG, ACCENT
+import json
+from engine.video_overlay import VideoOverlayEngine
 from screens.welcome import WelcomeScreen
 from screens.player_selection import PlayerSelectionScreen
 from screens.camera_preview import CameraPreviewScreen
@@ -23,6 +27,7 @@ from screens.photo_view import PhotoViewScreen
 from screens.simulation import SimulationScreen
 from screens.final_screen import FinalScreen
 from screens.loading_screen import LoadingScreen
+from camera_manager import CameraManager
 
 class StadiumApp(QMainWindow):
     """Main application window."""
@@ -49,8 +54,23 @@ class StadiumApp(QMainWindow):
         # Estilo
         self.setStyleSheet(f"QMainWindow {{ background-color: {BG}; }}")
 
+        # Pre-cargar videos y cámara en segundo plano
+        threading.Thread(target=self._preload_assets, daemon=True).start()
+
         # Mostrar pantalla de bienvenida
         self.show_welcome()
+
+    def _preload_assets(self):
+        try:
+            # La cámara ya está inicializada desde main()
+            
+            # Cargar y PRE-CALENTAR todos los videos
+            with open("assets/players.json", "r", encoding="utf-8") as f:
+                players_data = json.load(f)
+                # Calentar a 1280x720 (resolución típica de preview)
+                VideoOverlayEngine.warm_up(players_data, 720, 1280)
+        except Exception as e:
+            print(f"[Main] Preload error: {e}")
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
@@ -59,6 +79,8 @@ class StadiumApp(QMainWindow):
         """Eliminar todos los widgets del stacked widget."""
         while self.stacked.count() > 0:
             widget = self.stacked.widget(0)
+            if hasattr(widget, "on_destroy"):
+                widget.on_destroy()
             self.stacked.removeWidget(widget)
             widget.deleteLater()
 
@@ -115,6 +137,12 @@ class StadiumApp(QMainWindow):
 
 def main():
     app = QApplication(sys.argv)
+    
+    # 1. LO PRIMERO: Encender cámara (bloqueante al inicio para seguridad)
+    from camera_manager import CameraManager
+    CameraManager.get_cap()
+    
+    # 2. Iniciar App
     window = StadiumApp()
     window.show()
     sys.exit(app.exec_())

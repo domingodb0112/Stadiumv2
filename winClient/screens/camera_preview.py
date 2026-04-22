@@ -13,6 +13,7 @@ from config import (
     WIN_W, WIN_H, COUNTDOWN_SEC, REF_W, REF_H, OUTPUT_DIR
 )
 from screens.base_screen import BaseScreen
+from camera_manager import CameraManager
 from engine.video_overlay import VideoOverlayEngine
 
 
@@ -34,10 +35,7 @@ class CameraPreviewScreen(BaseScreen):
         self._build_ui()
         self._start_camera()
         
-        # Iniciar reproducción tras 2 segundos (Antes eran 3)
-        QTimer.singleShot(2000, self._start_playback)
-        
-    def _start_playback(self):
+        # Iniciar reproducción de inmediato
         VideoOverlayEngine.set_paused(False)
 
     # ── UI ────────────────────────────────────────────────────────────────────
@@ -93,7 +91,7 @@ class CameraPreviewScreen(BaseScreen):
         # (Deleted duplicate countdown label creation)
 
         # Capture button
-        self._btn_capture = QPushButton("📷 CAPTURAR")
+        self._btn_capture = QPushButton("CAPTURAR")
         self._btn_capture.setFont(QFont("Arial", 16, QFont.Bold))
         self._btn_capture.setFixedSize(200, 60)
         self._btn_capture.setStyleSheet(f"""
@@ -235,6 +233,11 @@ class CameraPreviewScreen(BaseScreen):
         import time as _t
         path = str(OUTPUT_DIR / f"photo_{int(_t.time())}.jpg")
         cv2.imwrite(path, self._photo_frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
+        
+        # OPTIMIZACIÓN: Empezar la segmentación en segundo plano de inmediato
+        from screens.simulation import PreProcessingEngine
+        PreProcessingEngine.start_segmentation(path)
+        
         self.app.show_photo_view(path, self._players)
 
     # ── Navigation / cleanup ──────────────────────────────────────────────────
@@ -251,6 +254,5 @@ class CameraPreviewScreen(BaseScreen):
             self._timer.stop()
         if hasattr(self, "_countdown_timer"):
             self._countdown_timer.stop()
-        if self._cap:
-            self._cap.release()
-        VideoOverlayEngine.stop_all()
+        # No liberamos self._cap ni los hilos de video para que sean persistentes
+        pass

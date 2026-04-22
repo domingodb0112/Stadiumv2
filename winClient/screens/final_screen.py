@@ -87,8 +87,8 @@ class FinalScreen(QWidget):
 
         self._overlay.setGeometry(0, 0, w, h)
 
-        # Scale QR image
-        qr_size = int(h * 0.22)   # Reducido de 35% a 22% (aprox 1/4 de la ui)
+        # Scale QR image (Literalmente un cuadrado pequeño)
+        qr_size = int(h * 0.12)   # Reducido al 12% de la altura
         if self._qr_pixmap and not self._qr_pixmap.isNull():
             scaled = self._qr_pixmap.scaled(
                 QSize(qr_size, qr_size), Qt.KeepAspectRatio, Qt.SmoothTransformation
@@ -107,11 +107,11 @@ class FinalScreen(QWidget):
         """)
 
         # Adaptive fonts
-        self._scan_lbl.setFont(QFont("Arial", _fs(h, 0.018), QFont.Bold))
+        self._scan_lbl.setFont(QFont("Arial", _fs(h, 0.012), QFont.Bold))
 
-        btn_font_size = _fs(h, 0.022) 
-        btn_h = int(h * 0.07) # Reducido
-        btn_w = int(w * 0.40) # Más estrecho
+        btn_font_size = _fs(h, 0.018) 
+        btn_h = int(h * 0.05) # Reducido a la mitad
+        btn_w = int(w * 0.30) # Más estrecho
         btn_radius = btn_h // 2
         self._btn.setMinimumSize(btn_w, btn_h)
         self._btn.setFont(QFont("Arial", btn_font_size, QFont.Bold))

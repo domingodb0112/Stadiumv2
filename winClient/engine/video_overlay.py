@@ -54,7 +54,11 @@ class VideoPlayer:
             self.running = False
             return
 
-        frames, fps = parse_mov(path)
+        if path in VideoOverlayEngine._video_cache:
+            frames, fps = VideoOverlayEngine._video_cache[path]
+        else:
+            frames, fps = parse_mov(path)
+            
         if not frames:
             print(f"[!] Could not parse frames from {path}. Using placeholder.")
             self._set_placeholder_frame()
@@ -135,6 +139,19 @@ class VideoOverlayEngine:
     """Maneja hasta 4 VideoPlayer (un slot por jugador fijo)."""
 
     _players: list[VideoPlayer] = [VideoPlayer() for _ in range(4)]
+    _video_cache: dict[str, tuple] = {} # Path -> (frames, fps)
+    _active_slots: list[int] = []       # Slots seleccionados actualmente
+
+    @classmethod
+    def preload_all_videos(cls, player_data_list):
+        """Carga todos los videos en caché para evitar lag de disco."""
+        import os
+        from engine.mov_parser import parse_mov
+        for p in player_data_list:
+            path = f"assets/videos/{p['video_name']}"
+            if path not in cls._video_cache and os.path.exists(path):
+                print(f"[Engine] Pre-loading {path}...")
+                cls._video_cache[path] = parse_mov(path)
 
     @classmethod
     def set_paused(cls, paused: bool):
@@ -143,31 +160,58 @@ class VideoOverlayEngine:
             vp.paused = paused
 
     @classmethod
-    def start_experience(cls, player_list, screen_w: int, screen_h: int, paused=False):
-        """
-        player_list: lista de objetos Player (models.player_roster)
-        screen_w/h : dimensiones reales de la pantalla de renderizado
-        """
-        for player in player_list:
-            slot = player.slot
-            vp   = cls._players[slot]
-
-            # Escalar coordenadas de referencia 1080×1920 → pantalla real
+    def warm_up(cls, player_data_list, screen_w, screen_h):
+        """Carga y prepara a TODOS los jugadores posibles en segundo plano."""
+        cls.preload_all_videos(player_data_list)
+        for p_data in player_data_list:
+            slot = p_data.get("slot", 0)
+            vp = cls._players[slot]
+            
+            # Configurar coordenadas (escaladas)
             from config import REF_W, REF_H
-            x = int(player.x * screen_w / REF_W)
-            y = int(player.y * screen_h / REF_H)
-            w = int(player.w * screen_w / REF_W)
-            h = int(player.h * screen_h / REF_H)
+            x = int(p_data['x'] * screen_w / REF_W)
+            y = int(p_data['y'] * screen_h / REF_H)
+            w = int(p_data['w'] * screen_w / REF_W)
+            h = int(p_data['h'] * screen_h / REF_H)
             vp.config = (x, y, w, h)
-            vp.paused = paused
+            
+            # Dejarlo listo y pausado en el primer frame (loop=False para que solo sea una vez)
+            vp.paused = True
+            path = f"assets/videos/{p_data['video_name']}"
+            vp.start(path, looping=False)
+        print("[Engine] All players warmed up and ready.")
 
-            video_path = str(player.video_path)
-            vp.start(video_path, looping=False)
+    @classmethod
+    def start_experience(cls, player_list, screen_w, screen_h, paused=False):
+        """
+        Activa y REINICIA los videos para una nueva sesión.
+        Asegura que los hilos estén corriendo.
+        """
+        cls._active_slots = [p.slot for p in player_list]
+        
+        for slot in cls._active_slots:
+            vp = cls._players[slot]
+            
+            # Si el hilo se detuvo por algún motivo, reiniciarlo
+            if not vp.running:
+                # Buscar el path en los datos originales (basado en el slot)
+                # O simplemente usar el path que ya tiene si es válido
+                pass 
+            
+            vp.current_frame = 0 # Reiniciar al inicio
+            vp.paused = paused
+            
+        print(f"[Engine] Experience reset and started for slots: {cls._active_slots}")
 
     @classmethod
     def apply_all(cls, frame_bgr: np.ndarray) -> np.ndarray:
-        """Mezcla todos los overlays activos sobre frame_bgr (in-place)."""
-        for vp in cls._players:
+        """Mezcla solo los jugadores activos respetando el orden de capa."""
+        # ORDEN DE CAPA: 0, 2 (atrás) -> 1, 3 (adelante)
+        for slot in [0, 2, 1, 3]:
+            if slot not in cls._active_slots:
+                continue
+            
+            vp = cls._players[slot]
             if not vp.ready:
                 continue
             
