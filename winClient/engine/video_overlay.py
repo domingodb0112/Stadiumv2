@@ -99,12 +99,18 @@ class VideoOverlayEngine:
 
     @classmethod
     def get_cached_image(cls, path: str):
-        """Devuelve una imagen desde la RAM, leyéndola del disco solo la primera vez."""
-        if path not in cls._img_cache:
-            img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+        """Devuelve una imagen desde la RAM usando rutas normalizadas."""
+        import os
+        from pathlib import Path
+        norm_path = str(Path(path).resolve())
+        if norm_path not in cls._img_cache:
+            print(f"[Engine] Loading image to RAM: {norm_path}")
+            img = cv2.imread(norm_path, cv2.IMREAD_UNCHANGED)
             if img is not None:
-                cls._img_cache[path] = img
-        return cls._img_cache.get(path)
+                cls._img_cache[norm_path] = img
+            else:
+                print(f"[!] Engine Error: Could not read image at {norm_path}")
+        return cls._img_cache.get(norm_path)
 
     @classmethod
     def preload_all_videos(cls, player_data_list):
@@ -117,8 +123,10 @@ class VideoOverlayEngine:
 
         for p in player_data_list:
             path = f"assets/videos/{p['video_name']}"
-            if path not in cls._video_cache and os.path.exists(path):
-                print(f"[Engine] HYPER-CACHING {path}...")
+            from pathlib import Path
+            abs_path = str(Path(path).absolute())
+            if path not in cls._video_cache and os.path.exists(abs_path):
+                print(f"[Engine] HYPER-CACHING (Dual-Scale) from: {abs_path}")
                 frames_meta, fps = parse_mov(path)
                 
                 # Tamaño Final (1080p)
@@ -155,8 +163,9 @@ class VideoOverlayEngine:
     @classmethod
     def warm_up(cls, player_data_list, screen_w, screen_h):
         cls.preload_all_videos(player_data_list)
-        # Pre-cargar fondos comunes
-        cls.get_cached_image("assets/backgrounds/cancha.png")
+        # Pre-cargar fondos comunes usando ruta robusta
+        from config import PHOTOS_DIR
+        cls.get_cached_image(str(PHOTOS_DIR / "cancha.png"))
         
         for p_data in player_data_list:
             slot = p_data.get("slot", 0)

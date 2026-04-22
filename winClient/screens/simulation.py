@@ -19,6 +19,7 @@ from screens.base_screen import BaseScreen
 from config import BG, ACCENT, TEXT_WHITE, TEXT_DIM, SIMULATION_MS, PHOTOS_DIR, REF_W, REF_H, OUTPUT_DIR
 from network_client import NetworkClient
 from segmentation_engine import SegmentationEngine
+from engine.video_overlay import VideoOverlayEngine
 from theme import BG_PRIMARY, INK_900, GREEN_600, GREEN_500, FONT_SANS, INK_400, BG_CARD
 from ui_components import TopBar, GradientBar
 
@@ -113,8 +114,9 @@ class ProcessingWorker(QObject):
 
     def run(self):
         try:
-            # 1. Cargar fondo (Desde RAM Caché)
-            cancha_path = "assets/backgrounds/cancha.png"
+            # 1. Cargar fondo (Desde RAM Caché usando ruta relativa al programa)
+            from config import PHOTOS_DIR
+            cancha_path = str(PHOTOS_DIR / "cancha.png")
             cancha_img = VideoOverlayEngine.get_cached_image(cancha_path)
             if cancha_img is not None:
                 bg = cv2.resize(cancha_img, (REF_W, REF_H))

@@ -72,10 +72,9 @@ class StadiumApp(QMainWindow):
             from camera_manager import CameraManager
             CameraManager.get_cap()
             
-            # 2. Cargar y PRE-CALENTAR todos los videos
+            # 2. Los videos ya fueron cargados en main(), aquí solo "calentamos" el preview
             with open("assets/players.json", "r", encoding="utf-8") as f:
                 players_data = json.load(f)
-                # Calentar usando el modo Dual-Cache
                 VideoOverlayEngine.warm_up(players_data, 720, 1280)
         except Exception as e:
             print(f"[Main] Preload error: {e}")
@@ -146,11 +145,19 @@ class StadiumApp(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     
-    # Iniciar App de inmediato (Cero esperas)
+    # Pre-cargar videos a la RAM ANTES de mostrar la interfaz (Requerimiento del usuario)
+    import json
+    from engine.video_overlay import VideoOverlayEngine
+    try:
+        with open("assets/players.json", "r", encoding="utf-8") as f:
+            players_data = json.load(f)
+            VideoOverlayEngine.preload_all_videos(players_data)
+    except Exception as e:
+        print(f"[Main] Error en pre-carga inicial: {e}")
+
+    # Iniciar App
     window = StadiumApp()
     window.show()
-    
-    # La cámara se encenderá en background cuando StadiumApp llame a _preload_assets
     
     sys.exit(app.exec_())
 
