@@ -39,11 +39,13 @@ class QRService:
             # Convertir QImage a QPixmap
             pixmap = QPixmap.fromImage(qimage)
 
-            # Escalar si es necesario
+            # Escalar si es necesario para que quepa en max_size
             if pixmap.width() > max_size or pixmap.height() > max_size:
-                pixmap = pixmap.scaledToWidth(
-                    max_size, mode=1
-                )  # mode=1 es SmoothTransformation
+                pixmap = pixmap.scaled(
+                    max_size, max_size,
+                    Qt.KeepAspectRatio,
+                    Qt.SmoothTransformation
+                )
 
             return pixmap
 

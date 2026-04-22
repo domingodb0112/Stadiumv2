@@ -28,7 +28,7 @@ class FinalScreen(QWidget):
     """Photo (top portion) + bottom panel with green dot, QR code, 'Volver al inicio' button."""
 
     # Fraction of window height occupied by bottom panel
-    _PANEL_RATIO = 0.35
+    _PANEL_RATIO = 0.42
 
     def __init__(self, main_window, photo_path=None):
         super().__init__()
@@ -105,6 +105,7 @@ class FinalScreen(QWidget):
         qr_inner.setContentsMargins(8, 8, 8, 8)
         self._qr_label = QLabel()
         self._qr_label.setAlignment(Qt.AlignCenter)
+        self._qr_label.setScaledContents(True)
         self._qr_label.setStyleSheet("background: transparent; border: none;")
         qr_inner.addWidget(self._qr_label)
         qr_row.addWidget(self._qr_wrapper)
@@ -177,7 +178,7 @@ class FinalScreen(QWidget):
         )
 
         # QR
-        qr_sz = max(60, int(panel_h * 0.42))
+        qr_sz = max(60, int(panel_h * 0.30))
         self._qr_label.setFixedSize(qr_sz, qr_sz)
         if self._qr_pixmap and not self._qr_pixmap.isNull():
             self._qr_label.setPixmap(
@@ -191,7 +192,7 @@ class FinalScreen(QWidget):
         scan_pt  = max(10, int(h * 0.009))
         desc_pt  = max(9,  int(h * 0.008))
         btn_pt   = max(12, int(h * 0.011))
-        btn_h    = max(44, int(panel_h * 0.26))
+        btn_h    = max(44, int(panel_h * 0.18))
         btn_r    = max(10, int(h * 0.013))
 
         self._lbl_ready.setFont(QFont(FONT_SANS, ready_pt, QFont.DemiBold))
@@ -202,12 +203,12 @@ class FinalScreen(QWidget):
         self._btn.setFixedHeight(btn_h)
         self._btn.setStyleSheet(btn_primary(radius=btn_r, font_size=btn_pt))
 
-        # Panel inner margins
+        # Panel inner margins - even more compact to guarantee fit
         self._panel.layout().setContentsMargins(
-            max(16, int(w * 0.04)), max(12, int(panel_h * 0.08)),
-            max(16, int(w * 0.04)), max(16, int(panel_h * 0.12)),
+            max(16, int(w * 0.05)), max(8, int(panel_h * 0.05)),
+            max(16, int(w * 0.05)), max(8, int(panel_h * 0.05)),
         )
-        self._panel.layout().setSpacing(max(10, int(panel_h * 0.08)))
+        self._panel.layout().setSpacing(max(6, int(panel_h * 0.05)))
 
         self.update()
 
