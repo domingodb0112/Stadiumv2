@@ -28,6 +28,7 @@ from screens.simulation import SimulationScreen
 from screens.final_screen import FinalScreen
 from screens.loading_screen import LoadingScreen
 from camera_manager import CameraManager
+from theme import BG_PRIMARY
 
 class StadiumApp(QMainWindow):
     """Main application window."""
@@ -52,7 +53,7 @@ class StadiumApp(QMainWindow):
         self.setCentralWidget(self.stacked)
 
         # Estilo
-        self.setStyleSheet(f"QMainWindow {{ background-color: {BG}; }}")
+        self.setStyleSheet(f"QMainWindow {{ background-color: {BG_PRIMARY}; }}")
 
         # Pre-cargar videos y cámara en segundo plano
         threading.Thread(target=self._preload_assets, daemon=True).start()

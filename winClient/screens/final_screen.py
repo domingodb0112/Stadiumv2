@@ -28,7 +28,7 @@ class FinalScreen(QWidget):
     """Photo (top portion) + bottom panel with green dot, QR code, 'Volver al inicio' button."""
 
     # Fraction of window height occupied by bottom panel
-    _PANEL_RATIO = 0.22
+    _PANEL_RATIO = 0.28
 
     def __init__(self, main_window, photo_path=None):
         super().__init__()
@@ -203,7 +203,7 @@ class FinalScreen(QWidget):
         # Panel inner margins
         self._panel.layout().setContentsMargins(
             max(16, int(w * 0.04)), max(12, int(panel_h * 0.08)),
-            max(16, int(w * 0.04)), max(8, int(panel_h * 0.06)),
+            max(16, int(w * 0.04)), max(16, int(panel_h * 0.12)),
         )
         self._panel.layout().setSpacing(max(10, int(panel_h * 0.08)))
 
