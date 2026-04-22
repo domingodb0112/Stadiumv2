@@ -1,11 +1,14 @@
 """
-Pantalla final: foto a pantalla completa, QR + botón superpuestos y escalados dinámicamente.
+Final screen — Design System C (Editorial Claro)
+Photo fills top, bottom panel has QR + button.
 """
 from PyQt5.QtWidgets import (
-    QWidget, QVBoxLayout, QLabel, QPushButton, QFrame, QSizePolicy
+    QWidget, QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy,
 )
 from PyQt5.QtCore import Qt, QSize
-from PyQt5.QtGui import QPixmap, QFont, QPainter, QColor
+from PyQt5.QtGui import (
+    QPixmap, QFont, QPainter, QColor, QLinearGradient, QPen, QBrush,
+)
 
 try:
     from qr_service import QRService
@@ -13,151 +16,223 @@ try:
 except ImportError:
     _HAS_QR = False
 
-_GREEN_DEEP    = "#064E3B"
-_GREEN_EMERALD = "#10B981"
-_GREEN_MID     = "#059669"
-_GREEN_PRESS   = "#047857"
-
-
-def _fs(height: int, ratio: float) -> int:
-    """Font size proportional to window height."""
-    return max(8, int(height * ratio))
+from theme import (
+    FONT_SANS, BG_PRIMARY, BG_CARD, INK_900, INK_400,
+    GREEN_500, GREEN_600, BORDER, BG_MUTED,
+    btn_primary,
+)
+from ui_components import GradientBar
 
 
 class FinalScreen(QWidget):
-    """Foto a pantalla completa con QR y botón superpuestos adaptativos."""
+    """Photo (top portion) + bottom panel with green dot, QR code, 'Volver al inicio' button."""
+
+    # Fraction of window height occupied by bottom panel
+    _PANEL_RATIO = 0.22
 
     def __init__(self, main_window, photo_path=None):
         super().__init__()
         self.main_window = main_window
         self.photo_path  = photo_path
         self._bg_pixmap  = None
-        self._qr_pixmap  = None   # raw QR, re-scaled on resize
+        self._qr_pixmap  = None
+        self.setStyleSheet(f"background-color: {BG_PRIMARY};")
         self._init_ui()
 
     # ── Build ──────────────────────────────────────────────────────────────────
 
     def _init_ui(self):
+        # The photo is drawn in paintEvent; overlay sits on top.
         self._overlay = QWidget(self)
         self._overlay.setStyleSheet("background: transparent;")
-        self._overlay.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
 
         root = QVBoxLayout(self._overlay)
         root.setContentsMargins(0, 0, 0, 0)
         root.setSpacing(0)
-        root.addStretch(1)
 
-        # ── QR panel ─────────────────────────────────────────────────────
-        self._qr_frame = QFrame()
-        self._qr_frame.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        qr_inner = QVBoxLayout(self._qr_frame)
-        qr_inner.setContentsMargins(16, 16, 16, 12)
-        qr_inner.setSpacing(6)
+        # ── Close button (top-right, floating) ────────────────────────────────
+        btn_row = QHBoxLayout()
+        btn_row.setContentsMargins(0, 16, 16, 0)
+        btn_row.addStretch()
+        self._btn_close = QPushButton("✕")
+        self._btn_close.setCursor(Qt.PointingHandCursor)
+        self._btn_close.clicked.connect(self._on_restart)
+        btn_row.addWidget(self._btn_close)
+        root.addLayout(btn_row)
 
+        root.addStretch(1)   # pushes panel to bottom
+
+        # ── Bottom panel ──────────────────────────────────────────────────────
+        self._panel = QWidget()
+        self._panel.setStyleSheet(
+            f"background-color: {BG_PRIMARY}; "
+            f"border-top: 1px solid rgba(0,0,0,30);"
+        )
+        panel_l = QVBoxLayout(self._panel)
+        panel_l.setAlignment(Qt.AlignCenter)
+
+        # "Tu foto está lista" row
+        ready_row = QHBoxLayout()
+        ready_row.setSpacing(10)
+        ready_row.setAlignment(Qt.AlignCenter)
+
+        self._dot = QLabel()
+        self._dot.setStyleSheet(
+            f"background-color: {GREEN_500}; border-radius: 4px;"
+        )
+        ready_row.addWidget(self._dot)
+
+        self._lbl_ready = QLabel("Tu foto está lista")
+        self._lbl_ready.setFont(QFont(FONT_SANS, 15, QFont.DemiBold))
+        self._lbl_ready.setStyleSheet(
+            f"color: {INK_900}; background: transparent; border: none;"
+        )
+        ready_row.addWidget(self._lbl_ready)
+        panel_l.addLayout(ready_row)
+
+        # QR + description row
+        qr_row = QHBoxLayout()
+        qr_row.setSpacing(16)
+        qr_row.setAlignment(Qt.AlignCenter)
+
+        self._qr_wrapper = QWidget()
+        self._qr_wrapper.setStyleSheet(f"""
+            background-color: {BG_CARD};
+            border: 1px solid rgba(0,0,0,20);
+            border-radius: 10px;
+        """)
+        qr_inner = QVBoxLayout(self._qr_wrapper)
+        qr_inner.setContentsMargins(8, 8, 8, 8)
         self._qr_label = QLabel()
         self._qr_label.setAlignment(Qt.AlignCenter)
         self._qr_label.setStyleSheet("background: transparent; border: none;")
-        self._qr_label.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
-        qr_inner.addWidget(self._qr_label, alignment=Qt.AlignCenter)
+        qr_inner.addWidget(self._qr_label)
+        qr_row.addWidget(self._qr_wrapper)
 
-        self._scan_lbl = QLabel("Escanea para descargar tu foto")
-        self._scan_lbl.setAlignment(Qt.AlignCenter)
-        self._scan_lbl.setStyleSheet(
-            f"color: {_GREEN_DEEP}; background: transparent; border: none;"
+        desc_w = QWidget()
+        desc_w.setStyleSheet("background: transparent;")
+        desc_l = QVBoxLayout(desc_w)
+        desc_l.setContentsMargins(0, 0, 0, 0)
+        desc_l.setSpacing(4)
+
+        self._lbl_scan = QLabel("Escanea con tu cámara")
+        self._lbl_scan.setFont(QFont(FONT_SANS, 13, QFont.DemiBold))
+        self._lbl_scan.setStyleSheet(
+            f"color: {INK_900}; background: transparent; border: none;"
         )
-        qr_inner.addWidget(self._scan_lbl)
+        desc_l.addWidget(self._lbl_scan)
 
-        root.addWidget(self._qr_frame, alignment=Qt.AlignHCenter)
-        root.addSpacing(0)   # dynamic via resizeEvent
+        self._lbl_desc = QLabel("Descarga tu foto al instante\ndesde tu teléfono.")
+        self._lbl_desc.setFont(QFont(FONT_SANS, 12))
+        self._lbl_desc.setStyleSheet(
+            f"color: {INK_400}; background: transparent; border: none;"
+        )
+        self._lbl_desc.setWordWrap(True)
+        desc_l.addWidget(self._lbl_desc)
+        qr_row.addWidget(desc_w, 1)
 
-        # ── Button ───────────────────────────────────────────────────────
-        self._btn = QPushButton("VOLVER AL INICIO")
-        self._btn.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        panel_l.addLayout(qr_row)
+
+        # "Volver al inicio" button
+        self._btn = QPushButton("Volver al inicio  →")
         self._btn.setCursor(Qt.PointingHandCursor)
         self._btn.clicked.connect(self._on_restart)
-        root.addWidget(self._btn, alignment=Qt.AlignHCenter)
+        panel_l.addWidget(self._btn)
 
-        root.addStretch(0)   # bottom padding controlled by resizeEvent margin
+        root.addWidget(self._panel)
+        root.addWidget(GradientBar(height=4))
 
     # ── Qt events ─────────────────────────────────────────────────────────────
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
         w, h = self.width(), self.height()
-
         self._overlay.setGeometry(0, 0, w, h)
 
-        # Scale QR image (Literalmente un cuadrado pequeño)
-        qr_size = int(h * 0.12)   # Reducido al 12% de la altura
-        if self._qr_pixmap and not self._qr_pixmap.isNull():
-            scaled = self._qr_pixmap.scaled(
-                QSize(qr_size, qr_size), Qt.KeepAspectRatio, Qt.SmoothTransformation
-            )
-            self._qr_label.setPixmap(scaled)
-        self._qr_label.setFixedSize(qr_size, qr_size)
+        panel_h = max(180, int(h * self._PANEL_RATIO))
+        self._panel.setFixedHeight(panel_h)
 
-        # QR frame border-radius
-        radius = int(qr_size * 0.10)
-        self._qr_frame.setStyleSheet(f"""
-            QFrame {{
-                background-color: rgba(255, 255, 255, 220);
-                border: 3px solid {_GREEN_EMERALD};
-                border-radius: {radius}px;
-            }}
-        """)
-
-        # Adaptive fonts
-        self._scan_lbl.setFont(QFont("Arial", _fs(h, 0.012), QFont.Bold))
-
-        btn_font_size = _fs(h, 0.018) 
-        btn_h = int(h * 0.05) # Reducido a la mitad
-        btn_w = int(w * 0.30) # Más estrecho
-        btn_radius = btn_h // 2
-        self._btn.setMinimumSize(btn_w, btn_h)
-        self._btn.setFont(QFont("Arial", btn_font_size, QFont.Bold))
-        self._btn.setStyleSheet(f"""
+        # Close button
+        close_sz = max(28, int(h * 0.026))
+        close_r  = max(6,  int(h * 0.007))
+        self._btn_close.setFixedSize(close_sz, close_sz)
+        self._btn_close.setFont(QFont(FONT_SANS, max(10, int(h * 0.009))))
+        self._btn_close.setStyleSheet(f"""
             QPushButton {{
-                background-color: {_GREEN_EMERALD};
+                background-color: rgba(0,0,0,100);
                 color: white;
                 border: none;
-                border-radius: {btn_radius}px;
-                font-weight: bold;
-                font-size: {btn_font_size}px;
-                padding: 0 {int(w * 0.04)}px;
+                border-radius: {close_r}px;
             }}
-            QPushButton:hover   {{ background-color: {_GREEN_MID};   }}
-            QPushButton:pressed {{ background-color: {_GREEN_PRESS}; }}
+            QPushButton:hover {{ background-color: rgba(0,0,0,150); }}
         """)
 
-        # Bottom margin = 5 % of height
-        layout = self._overlay.layout()
-        layout.setContentsMargins(0, 0, 0, int(h * 0.05))
+        # Green dot
+        dot_sz = max(6, int(h * 0.006))
+        self._dot.setFixedSize(dot_sz, dot_sz)
+        self._dot.setStyleSheet(
+            f"background-color: {GREEN_500}; border-radius: {dot_sz // 2}px;"
+        )
+
+        # QR
+        qr_sz = max(60, int(panel_h * 0.42))
+        self._qr_label.setFixedSize(qr_sz, qr_sz)
+        if self._qr_pixmap and not self._qr_pixmap.isNull():
+            self._qr_label.setPixmap(
+                self._qr_pixmap.scaled(
+                    QSize(qr_sz, qr_sz), Qt.KeepAspectRatio, Qt.SmoothTransformation
+                )
+            )
+
+        # Fonts
+        ready_pt = max(12, int(h * 0.010))
+        scan_pt  = max(10, int(h * 0.009))
+        desc_pt  = max(9,  int(h * 0.008))
+        btn_pt   = max(12, int(h * 0.011))
+        btn_h    = max(44, int(panel_h * 0.26))
+        btn_r    = max(10, int(h * 0.013))
+
+        self._lbl_ready.setFont(QFont(FONT_SANS, ready_pt, QFont.DemiBold))
+        self._lbl_scan.setFont(QFont(FONT_SANS, scan_pt, QFont.DemiBold))
+        self._lbl_desc.setFont(QFont(FONT_SANS, desc_pt))
+
+        self._btn.setFont(QFont(FONT_SANS, btn_pt, QFont.DemiBold))
+        self._btn.setFixedHeight(btn_h)
+        self._btn.setStyleSheet(btn_primary(radius=btn_r, font_size=btn_pt))
+
+        # Panel inner margins
+        self._panel.layout().setContentsMargins(
+            max(16, int(w * 0.04)), max(12, int(panel_h * 0.08)),
+            max(16, int(w * 0.04)), max(8, int(panel_h * 0.06)),
+        )
+        self._panel.layout().setSpacing(max(10, int(panel_h * 0.08)))
+
+        self.update()
 
     def paintEvent(self, event):
         painter = QPainter(self)
         painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
-        
-        # Fondo oscuro para las barras laterales
-        painter.fillRect(self.rect(), QColor(12, 12, 12))
-        
+
+        panel_h = self._panel.height() + 4  # + gradient bar
+        photo_area_h = self.height() - panel_h
+
+        # Dark background behind photo letterbox
+        painter.fillRect(0, 0, self.width(), photo_area_h, QColor("#1a1f1c"))
+
         if self._bg_pixmap and not self._bg_pixmap.isNull():
-            # ESCALADO CENTRADO (Vertical 1080x1920)
+            available = self.size()
+            available.setHeight(photo_area_h)
             scaled = self._bg_pixmap.scaled(
-                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
+                available, Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
-            x = (self.width()  - scaled.width())  // 2
-            y = (self.height() - scaled.height()) // 2
-            
-            # Dibujar la foto
+            x = (self.width() - scaled.width()) // 2
+            y = (photo_area_h - scaled.height()) // 2
             painter.drawPixmap(x, y, scaled)
-        else:
-            painter.fillRect(self.rect(), QColor(0, 0, 0))
 
     # ── Public API ────────────────────────────────────────────────────────────
 
     def set_final_image(self, image_path: str, qr_base64: str) -> None:
-        """Establece foto de fondo y QR recibido del servidor."""
         self.photo_path = image_path
 
         pixmap = QPixmap(image_path)
@@ -166,11 +241,9 @@ class FinalScreen(QWidget):
             self.update()
 
         if _HAS_QR and qr_base64:
-            from qr_service import QRService
             raw = QRService.base64_to_pixmap(qr_base64, max_size=512)
             if raw:
                 self._qr_pixmap = raw
-                # trigger re-scale via resizeEvent logic
                 self.resizeEvent(None)
 
     # ── Callback ──────────────────────────────────────────────────────────────

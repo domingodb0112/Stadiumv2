@@ -1,102 +1,35 @@
 """
-player_selection.py (PyQt5)
-Pantalla de selección de jugadores en grid 2×2 con tarjetas circulares.
+player_selection.py — Design System C (Editorial Claro)
+Grid 2-column player cards with check-badge selection state.
 """
 
 from PyQt5.QtWidgets import (
     QVBoxLayout, QHBoxLayout, QGridLayout, QLabel, QPushButton,
-    QWidget, QFrame, QSizePolicy
+    QWidget, QFrame, QSizePolicy, QScrollArea,
 )
-from PyQt5.QtCore import Qt, QSize, QPropertyAnimation, QEasingCurve, pyqtProperty, QTimer
-from PyQt5.QtGui import QFont, QPixmap, QPainter, QColor, QPen
+from PyQt5.QtCore import Qt, QSize, QTimer
+from PyQt5.QtGui import QFont, QPixmap, QPainter, QColor, QPen, QBrush
+
 from PIL import Image, ImageDraw
+import io
 
 from screens.base_screen import BaseScreen
 from models.player_roster import ALL as PLAYERS, reset_selection
-from config import BG, TEXT_WHITE, TEXT_DIM, ACCENT, BTN_DARK, WIN_W, WIN_H
-
-_SPINNER_COLOR = QColor("#10B981")
-_SPINNER_WIDTH = 3
-
-
-# ── Spinner ───────────────────────────────────────────────────────────────────
-
-class SelectionSpinner(QWidget):
-    """Indeterminate arc spinner drawn with QPainter, animated via QPropertyAnimation."""
-
-    def __init__(self, parent=None):
-        super().__init__(parent)
-        self.setAttribute(Qt.WA_TransparentForMouseEvents)
-        self.setAttribute(Qt.WA_NoSystemBackground)
-        self.setAttribute(Qt.WA_TranslucentBackground)
-        self.setStyleSheet("background: transparent;")
-        self._angle = 0
-
-        self._anim = QPropertyAnimation(self, b"angle", self)
-        self._anim.setStartValue(0)
-        self._anim.setEndValue(360)
-        self._anim.setDuration(900)
-        self._anim.setLoopCount(-1)
-        self._anim.setEasingCurve(QEasingCurve.Linear)
-
-        self.hide()
-
-    # ── pyqtProperty so QPropertyAnimation can drive it ──────────────────
-
-    @pyqtProperty(int)
-    def angle(self):
-        return self._angle
-
-    @angle.setter
-    def angle(self, value):
-        self._angle = value % 360
-        self.update()
-
-    # ── Public API ────────────────────────────────────────────────────────
-
-    def start(self):
-        self._anim.start()
-        self.show()
-        self.raise_()
-
-    def stop(self):
-        self._anim.stop()
-        self.hide()
-
-    # ── Drawing ───────────────────────────────────────────────────────────
-
-    def paintEvent(self, event):
-        size = min(self.width(), self.height())
-        if size < 6:
-            return
-
-        margin = _SPINNER_WIDTH + 1
-        rect_size = size - margin * 2
-
-        painter = QPainter(self)
-        painter.setRenderHint(QPainter.Antialiasing)
-
-        pen = QPen(_SPINNER_COLOR, _SPINNER_WIDTH, Qt.SolidLine, Qt.RoundCap)
-        painter.setPen(pen)
-        painter.setBrush(Qt.NoBrush)
-
-        x = (self.width()  - rect_size) // 2
-        y = (self.height() - rect_size) // 2
-
-        # Arc: 120° span rotating with _angle. Qt angles are in 1/16°.
-        start_angle = (90 - self._angle) * 16   # start at top, rotate CW
-        span_angle  = -120 * 16                  # 120° arc, clockwise
-        painter.drawArc(x, y, rect_size, rect_size, start_angle, span_angle)
-        painter.end()
+from ui_components import GradientBar, CheckBadge, TopBar
+from theme import (
+    FONT_SANS, BG_PRIMARY, BG_CARD, BG_MUTED, INK_900, INK_400, INK_600,
+    INK_200, GREEN_500, GREEN_600, GREEN_BG, GREEN_BORDER, BORDER,
+    btn_primary, btn_disabled_style,
+)
 
 
 # ── Helpers ───────────────────────────────────────────────────────────────────
 
-def _circle_image(path, size=110):
+def _circle_image(path, size=80):
     try:
         img = Image.open(path).convert("RGBA").resize((size, size), Image.LANCZOS)
     except Exception:
-        img = Image.new("RGBA", (size, size), "#333333")
+        img = Image.new("RGBA", (size, size), "#cccccc")
 
     mask = Image.new("L", (size, size), 0)
     ImageDraw.Draw(mask).ellipse((0, 0, size, size), fill=255)
@@ -106,7 +39,6 @@ def _circle_image(path, size=110):
 
 
 def _pil_to_qpixmap(pil_img):
-    import io
     buf = io.BytesIO()
     pil_img.save(buf, format="PNG")
     buf.seek(0)
@@ -115,100 +47,120 @@ def _pil_to_qpixmap(pil_img):
     return px
 
 
-# ── Card ──────────────────────────────────────────────────────────────────────
-
-_CARD_W        = 340 # Aumentado significativamente
-_CARD_H        = 400 # Aumentado significativamente
-_IMG_SIZE      = 280 # Aumentado significativamente
-_RADIUS        = 24
-_SPINNER_GAP   = 4   
-_SPINNER_SIZE  = _IMG_SIZE + 2 * (_SPINNER_GAP + _SPINNER_WIDTH)
-
+# ── Player card ───────────────────────────────────────────────────────────────
 
 class PlayerCardFrame(QFrame):
-    """Tarjeta de jugador con imagen circular, nombre y spinner de selección."""
+    """Card with avatar, name, position — selected state has green border + check badge."""
+
+    IMG_SIZE = 80   # logical default; rescaled in _refresh_layout
 
     def __init__(self, player, on_toggle, parent=None):
         super().__init__(parent)
         self.player    = player
         self.on_toggle = on_toggle
+        self._selected = False
         self.setFrameStyle(QFrame.NoFrame)
-        self.setFixedSize(_CARD_W, _CARD_H)
-        self._apply_style(selected=False)
-        self.setCursor(__import__("PyQt5.QtGui", fromlist=["QCursor"]).QCursor(Qt.PointingHandCursor))
+        self.setCursor(Qt.PointingHandCursor)
+        self._build()
 
-        layout = QVBoxLayout()
-        layout.setContentsMargins(8, 10, 8, 10)
-        layout.setSpacing(6)
-        layout.setAlignment(Qt.AlignCenter)
+    def _build(self):
+        self._layout = QVBoxLayout(self)
+        self._layout.setAlignment(Qt.AlignCenter)
+        self._layout.setContentsMargins(12, 16, 12, 12)
+        self._layout.setSpacing(8)
 
-        # Portrait
-        pil_img = _circle_image(str(player.image_path), size=_IMG_SIZE)
-        pixmap  = _pil_to_qpixmap(pil_img)
-
-        self._img_label = QLabel(self)
-        self._img_label.setPixmap(pixmap)
-        self._img_label.setFixedSize(_IMG_SIZE, _IMG_SIZE)
-        self._img_label.setAlignment(Qt.AlignCenter)
-        self._img_label.setStyleSheet("background: transparent; border: none;")
-        layout.addWidget(self._img_label, alignment=Qt.AlignCenter)
+        # Avatar (circle)
+        self._avatar_lbl = QLabel()
+        self._avatar_lbl.setAlignment(Qt.AlignCenter)
+        self._avatar_lbl.setStyleSheet("background: transparent; border: none;")
+        self._layout.addWidget(self._avatar_lbl, alignment=Qt.AlignCenter)
 
         # Name
-        self._name_label = QLabel(player.name, self)
-        self._name_label.setAlignment(Qt.AlignCenter)
-        self._name_label.setFont(QFont("Arial", 18, QFont.Bold)) # Letra más grande
-        self._name_label.setWordWrap(True)
-        self._name_label.setStyleSheet(
-            f"color: {TEXT_WHITE}; background: transparent; border: none;"
+        self._name_lbl = QLabel(self.player.name)
+        self._name_lbl.setFont(QFont(FONT_SANS, 13, QFont.Bold))
+        self._name_lbl.setAlignment(Qt.AlignCenter)
+        self._name_lbl.setWordWrap(True)
+        self._name_lbl.setStyleSheet(
+            f"color: {INK_900}; background: transparent; border: none;"
         )
-        layout.addWidget(self._name_label, alignment=Qt.AlignCenter)
+        self._layout.addWidget(self._name_lbl)
 
-        self.setLayout(layout)
+        # Position label
+        pos_text = getattr(self.player, "position", "Jugador")
+        self._pos_lbl = QLabel(pos_text)
+        self._pos_lbl.setFont(QFont(FONT_SANS, 11))
+        self._pos_lbl.setAlignment(Qt.AlignCenter)
+        self._pos_lbl.setStyleSheet(
+            f"color: {INK_400}; background: transparent; border: none;"
+        )
+        self._layout.addWidget(self._pos_lbl)
 
-        # Spinner — transparent overlay, positioned after layout resolves
-        self._spinner = SelectionSpinner(self)
-        QTimer.singleShot(0, self._place_spinner)
+        # Check badge (hidden by default, shown on selection)
+        self._badge = CheckBadge(parent=self)
+        self._badge.hide()
 
-    def _place_spinner(self):
-        """Size spinner to encircle the portrait and align to its actual geometry."""
-        geo = self._img_label.geometry()
-        if geo.width() > 0:
-            cx, cy = geo.center().x(), geo.center().y()
+        self._load_avatar(self.IMG_SIZE)
+        self._apply_style()
+
+    def _load_avatar(self, size: int):
+        pil = _circle_image(str(self.player.image_path), size=size)
+        px  = _pil_to_qpixmap(pil)
+        self._avatar_lbl.setPixmap(px)
+        self._avatar_lbl.setFixedSize(size, size)
+
+    def _apply_style(self):
+        if self._selected:
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {BG_CARD};
+                    border: 2px solid {GREEN_500};
+                    border-radius: 16px;
+                }}
+            """)
+            self._pos_lbl.setStyleSheet(
+                f"color: {GREEN_600}; background: transparent; border: none;"
+            )
         else:
-            cx = self.width() // 2
-            cy = 10 + _IMG_SIZE // 2          # top-margin + half portrait
-        s = _SPINNER_SIZE
-        self._spinner.setGeometry(cx - s // 2, cy - s // 2, s, s)
+            self.setStyleSheet(f"""
+                QFrame {{
+                    background-color: {BG_MUTED};
+                    border: 2px solid transparent;
+                    border-radius: 16px;
+                }}
+            """)
+            self._pos_lbl.setStyleSheet(
+                f"color: {INK_400}; background: transparent; border: none;"
+            )
 
     def resizeEvent(self, event):
         super().resizeEvent(event)
-        self._place_spinner()
+        # Place badge at top-right
+        bw = self._badge.width()
+        bh = self._badge.height()
+        self._badge.move(self.width() - bw - 8, 8)
 
     def mousePressEvent(self, event):
         self.on_toggle()
 
-    def _apply_style(self, selected: bool):
-        border_color = ACCENT if selected else "#333333"
-        self.setStyleSheet(f"""
-            QFrame {{
-                background-color: #1a1a1a;
-                border: 3px solid {border_color};
-                border-radius: {_RADIUS}px;
-            }}
-        """)
-
     def set_selected(self, selected: bool):
-        self._apply_style(selected)
+        self._selected = selected
+        self._apply_style()
         if selected:
-            self._spinner.start()
+            self._badge.show()
+            self._badge.raise_()
         else:
-            self._spinner.stop()
+            self._badge.hide()
+
+    def set_img_size(self, size: int):
+        """Rescale avatar when card is resized by parent."""
+        if size != self.IMG_SIZE:
+            PlayerCardFrame.IMG_SIZE = size
+            self._load_avatar(size)
 
 
 # ── Screen ────────────────────────────────────────────────────────────────────
 
 class PlayerSelectionScreen(BaseScreen):
-    """Pantalla de selección de jugadores en grid 2×2."""
 
     def __init__(self, app, **kwargs):
         super().__init__(app, **kwargs)
@@ -217,143 +169,195 @@ class PlayerSelectionScreen(BaseScreen):
         self._build_ui()
 
     def _build_ui(self):
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(20, 48, 20, 40)
-        main_layout.setSpacing(0)
+        self.setStyleSheet(f"background-color: {BG_PRIMARY};")
 
-        # ── Header ────────────────────────────────────────────────────────
-        self._title = QLabel("ELIGE TUS JUGADORES")
-        self._title.setFont(QFont("Arial Black", 80, QFont.Bold)) # Aumentado
-        self._title.setStyleSheet(f"color: {TEXT_WHITE};")
-        self._title.setAlignment(Qt.AlignCenter)
-        self._title.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        main_layout.addWidget(self._title)
+        outer = QVBoxLayout()
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
-        self._subtitle = QLabel("Selecciona los jugadores que aparecerán en tu foto")
-        self._subtitle.setFont(QFont("Arial", 28)) # Aumentado
-        self._subtitle.setStyleSheet(f"color: {TEXT_DIM};")
-        self._subtitle.setAlignment(Qt.AlignCenter)
-        self._subtitle.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        main_layout.addWidget(self._subtitle)
-        main_layout.addSpacing(6)
+        # ── Top bar ───────────────────────────────────────────────────────────
+        self._top_bar = TopBar()
+        self._top_bar.set_brand_mode()
+        outer.addWidget(self._top_bar)
 
-        self._lbl_count = QLabel("0 seleccionados")
-        self._lbl_count.setFont(QFont("Arial", 14))
-        self._lbl_count.setStyleSheet(f"color: {ACCENT};")
-        self._lbl_count.setAlignment(Qt.AlignCenter)
-        self._lbl_count.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
-        main_layout.addWidget(self._lbl_count)
-        main_layout.addSpacing(20)
+        # ── Header ────────────────────────────────────────────────────────────
+        header = QWidget()
+        header.setStyleSheet(f"background-color: {BG_PRIMARY};")
+        hl = QVBoxLayout(header)
+        hl.setContentsMargins(24, 20, 24, 12)
+        hl.setSpacing(0)
 
-        # ── Grid 2×2 ──────────────────────────────────────────────────────
-        grid_layout = QGridLayout()
-        grid_layout.setHorizontalSpacing(16)
-        grid_layout.setVerticalSpacing(16)
-        grid_layout.setAlignment(Qt.AlignCenter)
+        self._lbl_title = QLabel("Elige tus\njugadores")
+        self._lbl_title.setFont(QFont(FONT_SANS, 32, QFont.Black))
+        self._lbl_title.setStyleSheet(
+            f"color: {INK_900}; background: transparent; border: none;"
+        )
+        hl.addWidget(self._lbl_title)
+        hl.addSpacing(12)
+
+        self._underline = QWidget()
+        self._underline.setStyleSheet(f"background-color: {GREEN_500}; border-radius: 2px;")
+        hl.addWidget(self._underline, alignment=Qt.AlignLeft)
+        hl.addSpacing(12)
+
+        self._lbl_sub = QLabel("Selecciona quién aparecerá en tu foto")
+        self._lbl_sub.setFont(QFont(FONT_SANS, 13))
+        self._lbl_sub.setStyleSheet(
+            f"color: {INK_400}; background: transparent; border: none;"
+        )
+        hl.addWidget(self._lbl_sub)
+        hl.addSpacing(8)
+
+        # Counter row
+        count_row = QHBoxLayout()
+        count_row.setSpacing(6)
+        self._dot_count = QLabel()
+        self._dot_count.setStyleSheet(
+            f"background-color: rgba(0,0,0,51); border-radius: 3px;"
+        )
+        count_row.addWidget(self._dot_count, alignment=Qt.AlignVCenter)
+
+        self._lbl_count = QLabel("Ninguno seleccionado")
+        self._lbl_count.setFont(QFont(FONT_SANS, 13, QFont.DemiBold))
+        self._lbl_count.setStyleSheet(
+            f"color: {INK_400}; background: transparent; border: none;"
+        )
+        count_row.addWidget(self._lbl_count)
+        count_row.addStretch()
+        hl.addLayout(count_row)
+
+        outer.addWidget(header)
+
+        # ── Grid ──────────────────────────────────────────────────────────────
+        scroll = QScrollArea()
+        scroll.setWidgetResizable(True)
+        scroll.setFrameShape(QFrame.NoFrame)
+        scroll.setStyleSheet(f"background-color: {BG_PRIMARY}; border: none;")
+        scroll.verticalScrollBar().setStyleSheet(
+            "QScrollBar { width: 0px; }"
+        )
+
+        grid_container = QWidget()
+        grid_container.setStyleSheet(f"background-color: {BG_PRIMARY};")
+        self._grid = QGridLayout(grid_container)
+        self._grid.setContentsMargins(16, 8, 16, 8)
+        self._grid.setHorizontalSpacing(10)
+        self._grid.setVerticalSpacing(10)
 
         for idx, player in enumerate(PLAYERS):
             row, col = divmod(idx, 2)
-            card = PlayerCardFrame(player, lambda p=player: self._toggle_player(p))
+            card = PlayerCardFrame(player, lambda p=player: self._toggle(p))
+            card.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
             self._cards.append(card)
-            grid_layout.addWidget(card, row, col)
+            self._grid.addWidget(card, row, col)
 
-        grid_widget = QWidget()
-        grid_widget.setLayout(grid_layout)
-        grid_widget.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        main_layout.addWidget(grid_widget, 1, Qt.AlignCenter)
-        main_layout.addSpacing(20)
+        scroll.setWidget(grid_container)
+        outer.addWidget(scroll, 1)
 
-        # ── Continue button ───────────────────────────────────────────────
-        self._btn_continue = QPushButton("CONTINUAR")
-        self._btn_continue.setFont(QFont("Arial", 36, QFont.Bold)) # Aumentado
-        self._btn_continue.setMinimumSize(500, 120) # Más grande
-        self._btn_continue.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
+        # ── Bottom CTA ────────────────────────────────────────────────────────
+        bottom = QWidget()
+        bottom.setStyleSheet(
+            f"background-color: {BG_PRIMARY}; "
+            f"border-top: 1px solid rgba(0,0,0,30);"
+        )
+        bl = QVBoxLayout(bottom)
+        bl.setContentsMargins(16, 12, 16, 12)
+
+        self._btn_continue = QPushButton("Continuar")
+        self._btn_continue.setFont(QFont(FONT_SANS, 14, QFont.DemiBold))
         self._btn_continue.setEnabled(False)
+        self._btn_continue.setCursor(Qt.PointingHandCursor)
         self._btn_continue.clicked.connect(self._on_continue)
-        self._update_continue_button(0)
+        bl.addWidget(self._btn_continue)
 
-        btn_layout = QHBoxLayout()
-        btn_layout.addStretch()
-        btn_layout.addWidget(self._btn_continue)
-        btn_layout.addStretch()
-        main_layout.addLayout(btn_layout)
+        outer.addWidget(bottom)
+        outer.addWidget(GradientBar(height=4))
+        self.setLayout(outer)
 
-        wrapper = QWidget()
-        wrapper.setLayout(main_layout)
-        wrapper.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        wrapper_layout = QVBoxLayout()
-        wrapper_layout.setContentsMargins(0, 0, 0, 0)
-        wrapper_layout.addWidget(wrapper)
-        self.setLayout(wrapper_layout)
+        self._update_continue(0)
+        self._scale_fonts(self.height() or 1920)
 
-    # ── Toggle ────────────────────────────────────────────────────────────
+    # ── Toggle ────────────────────────────────────────────────────────────────
 
-    def _toggle_player(self, player):
+    def _toggle(self, player):
         player.selected = not player.selected
-
         idx = PLAYERS.index(player)
         self._cards[idx].set_selected(player.selected)
-
         count = sum(1 for p in PLAYERS if p.selected)
         self._lbl_count.setText(
-            f"{count} {'seleccionado' if count == 1 else 'seleccionados'}"
+            "Ninguno seleccionado" if count == 0
+            else f"{count} seleccionado{'s' if count > 1 else ''}"
         )
-        self._update_continue_button(count)
+        dot_color = GREEN_500 if count > 0 else "rgba(0,0,0,51)"
+        dot_size = self._dot_count.width()
+        self._dot_count.setStyleSheet(
+            f"background-color: {dot_color}; border-radius: {dot_size // 2}px;"
+        )
+        lbl_color = GREEN_600 if count > 0 else INK_400
+        self._lbl_count.setStyleSheet(
+            f"color: {lbl_color}; background: transparent; border: none;"
+        )
+        self._update_continue(count)
 
-    # ── Resize / Typography ───────────────────────────────────────────────
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
-        h = self.height()
-        fs_title    = max(14, int(h * 0.028))
-        fs_subtitle = max(10, int(h * 0.016))
-        fs_count    = max(10, int(h * 0.018))
-        fs_btn      = max(12, int(h * 0.022))
-        btn_h       = max(48, int(h * 0.072))
-        btn_radius  = btn_h // 2
-
-        self._title.setFont(QFont("Arial Black", fs_title, QFont.Bold))
-        self._subtitle.setFont(QFont("Arial", fs_subtitle))
-        self._lbl_count.setFont(QFont("Arial", fs_count))
-        self._btn_continue.setMinimumHeight(btn_h)
-        self._btn_continue.setFont(QFont("Arial Black", fs_btn, QFont.Bold))
-        self._apply_btn_style(btn_radius)
-
-    # ── Button style ──────────────────────────────────────────────────────
-
-    def _apply_btn_style(self, radius: int):
-        if self._btn_continue.isEnabled():
-            self._btn_continue.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {ACCENT};
-                    color: #FFFFFF;
-                    border: none;
-                    border-radius: {radius}px;
-                    font-weight: bold;
-                }}
-                QPushButton:hover   {{ background-color: #059669; }}
-                QPushButton:pressed {{ background-color: #047857; }}
-            """)
-        else:
-            self._btn_continue.setStyleSheet(f"""
-                QPushButton {{
-                    background-color: {BTN_DARK};
-                    color: #888888;
-                    border: none;
-                    border-radius: {radius}px;
-                    font-weight: bold;
-                }}
-                QPushButton:disabled {{
-                    background-color: {BTN_DARK};
-                    color: #888888;
-                }}
-            """)
-
-    def _update_continue_button(self, count):
+    def _update_continue(self, count: int):
         self._btn_continue.setEnabled(count > 0)
-        btn_h = self._btn_continue.minimumHeight() or 56
-        self._apply_btn_style(btn_h // 2)
+        h = self._btn_continue.height() or 54
+        r = max(10, h // 2 - 2)
+        fs = self._btn_continue.font().pointSize() or 14
+        if count > 0:
+            self._btn_continue.setText("Continuar  →")
+            self._btn_continue.setStyleSheet(btn_primary(radius=r, font_size=fs))
+        else:
+            self._btn_continue.setText("Continuar")
+            self._btn_continue.setStyleSheet(btn_disabled_style(radius=r, font_size=fs))
 
     def _on_continue(self):
         selected = [p for p in PLAYERS if p.selected]
         self.app.show_loading(selected)
+
+    # ── Scaling ───────────────────────────────────────────────────────────────
+
+    def _scale_fonts(self, h: int):
+        # Scale TopBar
+        if hasattr(self, "_top_bar"):
+            self._top_bar.scale_to(h)
+
+        title_pt   = max(18, int(h * 0.04))
+        sub_pt     = max(10, int(h * 0.010))
+        count_pt   = max(10, int(h * 0.010))
+        ul_w       = max(24, int(h * 0.022))
+        ul_h       = max(2,  int(h * 0.002))
+        btn_h      = max(48, int(h * 0.045))
+        btn_pt     = max(12, int(h * 0.011))
+        btn_r      = max(10, int(h * 0.013))
+        cdot_size  = max(5,  int(h * 0.005))
+        badge_size = max(16, int(h * 0.018))
+        img_size   = max(56, int(h * 0.066))
+
+        self._lbl_title.setFont(QFont(FONT_SANS, title_pt, QFont.Black))
+        self._lbl_sub.setFont(QFont(FONT_SANS, sub_pt))
+        self._underline.setFixedSize(ul_w, ul_h)
+
+        self._dot_count.setFixedSize(cdot_size, cdot_size)
+        self._lbl_count.setFont(QFont(FONT_SANS, count_pt, QFont.DemiBold))
+
+        self._btn_continue.setFixedHeight(btn_h)
+        self._btn_continue.setFont(QFont(FONT_SANS, btn_pt, QFont.DemiBold))
+
+        count = sum(1 for p in PLAYERS if p.selected)
+        if count > 0:
+            self._btn_continue.setStyleSheet(btn_primary(radius=btn_r, font_size=btn_pt))
+        else:
+            self._btn_continue.setStyleSheet(btn_disabled_style(radius=btn_r, font_size=btn_pt))
+
+        # Resize cards and their badges
+        for i, card in enumerate(self._cards):
+            card._name_lbl.setFont(QFont(FONT_SANS, max(10, int(h * 0.010)), QFont.Bold))
+            card._pos_lbl.setFont(QFont(FONT_SANS, max(9, int(h * 0.009))))
+            # Resize check badge
+            card._badge.setFixedSize(badge_size, badge_size)
+            card.set_img_size(img_size)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._scale_fonts(self.height())

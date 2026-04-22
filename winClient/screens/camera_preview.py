@@ -1,135 +1,224 @@
 """
-Camera preview screen for PyQt5 — optimized for high speed.
+Camera preview screen — Design System C (Editorial Claro)
+UI redesigned; all camera/video/segmentation logic is UNCHANGED.
 """
 import cv2
 import numpy as np
 import threading
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QGridLayout, QWidget
+
+from PyQt5.QtWidgets import (
+    QVBoxLayout, QHBoxLayout, QLabel, QPushButton,
+    QSizePolicy, QGridLayout, QWidget,
+)
 from PyQt5.QtCore import Qt, QTimer
-from PyQt5.QtGui import QFont, QPixmap, QImage, QCursor
+from PyQt5.QtGui import QFont, QPixmap, QImage, QCursor, QPainter, QColor, QPen
 
 from config import (
     BG, TEXT_WHITE, ACCENT,
-    WIN_W, WIN_H, COUNTDOWN_SEC, REF_W, REF_H, OUTPUT_DIR
+    WIN_W, WIN_H, COUNTDOWN_SEC, REF_W, REF_H, OUTPUT_DIR,
 )
 from screens.base_screen import BaseScreen
 from camera_manager import CameraManager
 from engine.video_overlay import VideoOverlayEngine
+from ui_components import GradientBar, CaptureButton, TopBar
+from theme import (
+    FONT_SANS, BG_PRIMARY, INK_900, INK_400, GREEN_500, GREEN_600,
+    BORDER, BG_MUTED,
+)
 
+
+# ── Corner-mark overlay widget ────────────────────────────────────────────────
+
+class _CornerMarks(QWidget):
+    """Draws green corner brackets over the camera viewport."""
+
+    def __init__(self, parent=None):
+        super().__init__(parent)
+        self.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self.setAttribute(Qt.WA_TranslucentBackground)
+        self.setStyleSheet("background: transparent;")
+
+    def paintEvent(self, event):
+        p = QPainter(self)
+        p.setRenderHint(QPainter.Antialiasing)
+        arm = max(14, min(self.width(), self.height()) // 14)
+        thick = max(2, arm // 6)
+        pen = QPen(QColor(GREEN_500), thick, Qt.SolidLine, Qt.RoundCap)
+        p.setPen(pen)
+        w, h = self.width(), self.height()
+        m = thick // 2
+        for (cx, cy, dx, dy) in [
+            (m, m, 1, 1), (w - m, m, -1, 1),
+            (m, h - m, 1, -1), (w - m, h - m, -1, -1),
+        ]:
+            p.drawLine(cx, cy, cx + dx * arm, cy)
+            p.drawLine(cx, cy, cx, cy + dy * arm)
+
+
+# ── Camera preview screen ─────────────────────────────────────────────────────
 
 class CameraPreviewScreen(BaseScreen):
-    """Pantalla de cámara en vivo con carga asíncrona para evitar lag."""
 
     def __init__(self, app, players, cap=None, **kwargs):
         super().__init__(app, **kwargs)
         self._players        = players
-        self._cap            = cap # Usar cámara inyectada si existe
+        self._cap            = cap
         self._running        = False
         self._countdown_left = 0
         self._counting       = False
         self._photo_frame    = None
         self._capture_pending = False
-        # Los jugadores ya están cargados y pausados desde la pantalla de carga.
-        # No hace falta activarlos/desactivarlos, solo darles 'Play'.
 
         self._build_ui()
         self._start_camera()
-        
-        # Iniciar reproducción de inmediato
         VideoOverlayEngine.set_paused(False)
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
     def _build_ui(self):
-        main_layout = QVBoxLayout()
-        main_layout.setContentsMargins(0, 0, 0, 0)
-        main_layout.setSpacing(0)
+        self.setStyleSheet(f"background-color: {BG_PRIMARY};")
 
-        # Viewport container (centered with margins)
-        self._viewport = QWidget()
-        self._viewport.setStyleSheet("background-color: transparent;")
-        
-        # Grid layout allows stacking widgets on top of each other in the same cell
-        self._view_layout = QGridLayout(self._viewport)
-        self._view_layout.setContentsMargins(0, 0, 0, 0)
-        self._view_layout.setSpacing(0)
+        outer = QVBoxLayout()
+        outer.setContentsMargins(0, 0, 0, 0)
+        outer.setSpacing(0)
 
-        # Video canvas (bottom layer)
+        # ── Top bar ───────────────────────────────────────────────────────────
+        self._top_bar = TopBar()
+        self._top_bar.set_title_mode(
+            "Posicionate", 
+            "FOTO CON JUGADORES", 
+            back_callback=self._on_back
+        )
+        outer.addWidget(self._top_bar)
+
+        # ── Camera viewport (with corner marks) ───────────────────────────────
+        self._viewport_wrapper = QWidget()
+        self._viewport_wrapper.setStyleSheet("background: transparent;")
+        vw_layout = QGridLayout(self._viewport_wrapper)
+        vw_layout.setContentsMargins(0, 0, 0, 0)
+        vw_layout.setSpacing(0)
+
+        # Camera canvas
         self._canvas = QLabel()
         self._canvas.setAlignment(Qt.AlignCenter)
-        self._canvas.setStyleSheet("background-color: #000; border: none;") 
+        self._canvas.setStyleSheet(
+            f"background-color: #1a1f1c; border-radius: 16px; border: none;"
+        )
         self._canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
-        self._view_layout.addWidget(self._canvas, 0, 0)
-        
-        # Countdown label (overlay layer)
+        vw_layout.addWidget(self._canvas, 0, 0)
+
+        # Corner marks overlay
+        self._corners = _CornerMarks(self._canvas)
+        self._corners.setAttribute(Qt.WA_TransparentForMouseEvents)
+
+        # Countdown label overlay
         self._lbl_countdown = QLabel("")
-        self._lbl_countdown.setFont(QFont("Arial Black", 180, QFont.Bold))
+        self._lbl_countdown.setFont(QFont(FONT_SANS, 160, QFont.Black))
         self._lbl_countdown.setStyleSheet(
-            "QLabel { color:white; background-color:transparent; }"
+            "QLabel { color: white; background-color: transparent; }"
         )
         self._lbl_countdown.setAlignment(Qt.AlignCenter)
         self._lbl_countdown.setAttribute(Qt.WA_TransparentForMouseEvents)
         self._lbl_countdown.hide()
-        self._view_layout.addWidget(self._lbl_countdown, 0, 0)
+        vw_layout.addWidget(self._lbl_countdown, 0, 0)
 
-        # Main layout con espaciado balanceado
-        main_layout.addSpacing(100)
-        main_layout.addWidget(self._viewport, 1) 
-        main_layout.addSpacing(80)
+        outer.addWidget(self._viewport_wrapper, 1)
 
-        # Back button
-        self._back_btn = QPushButton("←")
-        self._back_btn.setFont(QFont("Arial", 20))
-        self._back_btn.setFixedSize(48, 48)
-        self._back_btn.setStyleSheet("""
-            QPushButton           { background-color:#333; color:white; border:none; border-radius:24px; }
-            QPushButton:hover     { background-color:#555; }
-        """)
-        self._back_btn.setCursor(QCursor(Qt.PointingHandCursor))
-        self._back_btn.clicked.connect(self._on_back)
+        # ── Bottom control bar ────────────────────────────────────────────────
+        self._bottom_bar = QWidget()
+        self._bottom_bar.setStyleSheet(
+            f"background-color: {BG_PRIMARY}; "
+            f"border-top: 1px solid rgba(0,0,0,30);"
+        )
+        bottom_layout = QHBoxLayout(self._bottom_bar)
+        bottom_layout.setAlignment(Qt.AlignCenter)
+        bottom_layout.setSpacing(0)
+        bottom_layout.setContentsMargins(0, 0, 0, 0)
 
-        # (Deleted duplicate countdown label creation)
+        # Eye icon button (left side accessory)
+        self._btn_eye = QPushButton()
+        self._btn_eye.setCursor(Qt.PointingHandCursor)
+        self._btn_eye.setText("◎")
 
-        # Capture button
-        self._btn_capture = QPushButton("CAPTURAR")
-        self._btn_capture.setFont(QFont("Arial", 16, QFont.Bold))
-        self._btn_capture.setFixedSize(200, 60)
-        self._btn_capture.setStyleSheet(f"""
-            QPushButton           {{ background-color:{ACCENT}; color:white; border:none; border-radius:30px; font-weight:bold; }}
-            QPushButton:hover     {{ background-color:#059669; }}
-            QPushButton:pressed   {{ background-color:#047857; }}
-        """)
-        self._btn_capture.setCursor(QCursor(Qt.PointingHandCursor))
+        # Capture button (center)
+        self._btn_capture = CaptureButton(size=64)
         self._btn_capture.clicked.connect(self._start_countdown)
 
-        capture_row = QHBoxLayout()
-        capture_row.addStretch()
-        capture_row.addWidget(self._btn_capture)
-        capture_row.addStretch()
-        capture_row.setContentsMargins(0, 32, 0, 32)
+        # Camera icon button (right side accessory)
+        self._btn_cam_icon = QPushButton()
+        self._btn_cam_icon.setCursor(Qt.PointingHandCursor)
+        self._btn_cam_icon.setText("⊙")
 
-        main_layout.addLayout(capture_row)
-        self.setLayout(main_layout)
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(self._btn_eye)
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(self._btn_capture)
+        bottom_layout.addStretch()
+        bottom_layout.addWidget(self._btn_cam_icon)
+        bottom_layout.addStretch()
 
-    # ── Camera loop ───────────────────────────────────────────────────────────
+        outer.addWidget(self._bottom_bar)
+        self.setLayout(outer)
+
+        self._scale_ui(self.height() or 1920)
+
+    def _scale_ui(self, h: int):
+        # Scale TopBar
+        if hasattr(self, "_top_bar"):
+            self._top_bar.scale_to(h)
+
+        bar_h    = max(80, int(h * 0.090))
+        cap_sz   = max(48, int(h * 0.058))
+        acc_sz   = max(36, int(h * 0.035))
+        acc_r    = max(8,  int(h * 0.010))
+        acc_pt   = max(12, int(h * 0.012))
+        vw_m     = max(12, int(h * 0.010))  # viewport margin
+
+        self._bottom_bar.setFixedHeight(bar_h)
+
+        self._btn_capture.setFixedSize(cap_sz, cap_sz)
+
+        acc_style = f"""
+            QPushButton {{
+                background-color: {BG_MUTED};
+                color: {INK_900};
+                border: none;
+                border-radius: {acc_r}px;
+                font-size: {acc_pt}px;
+            }}
+            QPushButton:hover {{ background-color: #e2e3de; }}
+        """
+        self._btn_eye.setFixedSize(acc_sz, acc_sz)
+        self._btn_eye.setStyleSheet(acc_style)
+        self._btn_cam_icon.setFixedSize(acc_sz, acc_sz)
+        self._btn_cam_icon.setStyleSheet(acc_style)
+
+        cnt_pt = max(60, int(h * 0.110))
+        self._lbl_countdown.setFont(QFont(FONT_SANS, cnt_pt, QFont.Black))
+
+    # ── Corner marks follow canvas ─────────────────────────────────────────────
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        self._scale_ui(self.height())
+        # Place corner-mark overlay to cover the canvas exactly
+        QTimer.singleShot(0, self._reposition_corners)
+
+    def _reposition_corners(self):
+        self._corners.setGeometry(self._canvas.rect())
+
+    # ── Camera loop (UNCHANGED) ────────────────────────────────────────────────
 
     def _start_camera(self):
-        """Inicia la cámara y los videos en un hilo de fondo."""
         self._running = True
         self._timer = QTimer()
         self._timer.timeout.connect(self._capture_frame)
-        self._timer.start(33)   # ~30 FPS
+        self._timer.start(33)
 
         if self._cap is None:
-            # Solo si no se inyectó, abrimos en segundo plano
             threading.Thread(target=self._init_hardware_async, daemon=True).start()
-        else:
-            # Si ya tenemos cámara, los videos ya están cargados (por LoadingScreen)
-            # Solo nos aseguramos de que el motor sepa que estamos en preview
-            pass
 
     def _init_hardware_async(self):
-        """Apertura fallback de cámara."""
         try:
             if self._cap is None:
                 self._cap = cv2.VideoCapture(0)
@@ -145,29 +234,22 @@ class CameraPreviewScreen(BaseScreen):
         if not ret:
             return
 
-        # ── CENTER CROP 9:16 (1080x1920) ──────────────────────────────────
-        # La cámara suele dar 16:9 (horiz). Recortamos el centro para vertical.
         h, w = frame.shape[:2]
         target_aspect = 9 / 16
         current_aspect = w / h
 
         if current_aspect > target_aspect:
-            # Demasiado ancho (típico), recortamos lados
             new_w = int(h * target_aspect)
             x_offset = (w - new_w) // 2
             frame = frame[:, x_offset : x_offset + new_w]
         elif current_aspect < target_aspect:
-            # Demasiado alto, recortamos arriba/abajo
             new_h = int(w / target_aspect)
             y_offset = (h - new_h) // 2
             frame = frame[y_offset : y_offset + new_h, :]
 
-        # Ya tenemos proporción 9:16 real.
-        # INTERNAL SCALING a 720x1280 para FPS estables.
         PREVIEW_W = 720
         PREVIEW_H = 1280
-        
-        # Sincronizar motor de video con la resolución reducida
+
         if not hasattr(self, "_last_res") or self._last_res != (PREVIEW_W, PREVIEW_H):
             VideoOverlayEngine.start_experience(self._players, PREVIEW_W, PREVIEW_H)
             self._last_res = (PREVIEW_W, PREVIEW_H)
@@ -176,11 +258,9 @@ class CameraPreviewScreen(BaseScreen):
 
         if self._capture_pending:
             self._capture_pending = False
-            # CAPTURA RAW: Guardamos la foto limpia de la cámara para procesar después
             self._photo_frame = cv2.resize(frame, (REF_W, REF_H))
             preview_frame = VideoOverlayEngine.apply_all(preview_frame)
         else:
-            # Aplicar overlays (estarán pausados o en play según el timer)
             preview_frame = VideoOverlayEngine.apply_all(preview_frame)
 
         self._update_canvas(preview_frame)
@@ -188,24 +268,25 @@ class CameraPreviewScreen(BaseScreen):
     def _update_canvas(self, frame: np.ndarray):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
-        qt_img  = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
+        qt_img = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
         pixmap = QPixmap.fromImage(qt_img)
-        # Escalar al tamaño actual del canvas manteniendo aspecto
         scaled_pixmap = pixmap.scaled(
             self._canvas.size(),
             Qt.KeepAspectRatio,
-            Qt.SmoothTransformation
+            Qt.SmoothTransformation,
         )
         self._canvas.setPixmap(scaled_pixmap)
+        # Keep corner marks over canvas
+        self._corners.setGeometry(self._canvas.rect())
 
-    # ── Countdown ─────────────────────────────────────────────────────────────
+    # ── Countdown (UNCHANGED logic) ────────────────────────────────────────────
 
     def _start_countdown(self):
         if self._counting:
             return
         self._counting       = True
         self._countdown_left = COUNTDOWN_SEC
-        self._btn_capture.hide()
+        self._btn_capture.setVisible(False)
         self._lbl_countdown.show()
         self._countdown_timer = QTimer()
         self._countdown_timer.timeout.connect(self._tick)
@@ -220,7 +301,7 @@ class CameraPreviewScreen(BaseScreen):
             self._lbl_countdown.hide()
             self._counting        = False
             self._capture_pending = True
-            self._btn_capture.show()
+            self._btn_capture.setVisible(True)
             QTimer.singleShot(100, self._wait_for_photo)
 
     def _wait_for_photo(self):
@@ -233,17 +314,13 @@ class CameraPreviewScreen(BaseScreen):
         import time as _t
         path = str(OUTPUT_DIR / f"photo_{int(_t.time())}.jpg")
         cv2.imwrite(path, self._photo_frame, [cv2.IMWRITE_JPEG_QUALITY, 95])
-        
-        # OPTIMIZACIÓN: Empezar la segmentación en segundo plano de inmediato
+
         from screens.simulation import PreProcessingEngine
         PreProcessingEngine.start_segmentation(path)
-        
+
         self.app.show_photo_view(path, self._players)
 
-    # ── Navigation / cleanup ──────────────────────────────────────────────────
-
-    def resizeEvent(self, event):
-        super().resizeEvent(event)
+    # ── Navigation / cleanup (UNCHANGED) ──────────────────────────────────────
 
     def _on_back(self):
         self.app.show_player_selection()
@@ -254,5 +331,3 @@ class CameraPreviewScreen(BaseScreen):
             self._timer.stop()
         if hasattr(self, "_countdown_timer"):
             self._countdown_timer.stop()
-        # No liberamos self._cap ni los hilos de video para que sean persistentes
-        pass

@@ -2,14 +2,15 @@ import threading
 import time as _t
 import cv2
 import numpy as np
+import os
 
 from PyQt5.QtWidgets import (
     QVBoxLayout,
     QHBoxLayout,
     QLabel,
     QProgressBar,
-    QFrame,
     QWidget,
+    QSizePolicy
 )
 from PyQt5.QtCore import Qt, QTimer, pyqtSignal, QObject, QThread
 from PyQt5.QtGui import QFont
@@ -17,8 +18,9 @@ from PyQt5.QtGui import QFont
 from screens.base_screen import BaseScreen
 from config import BG, ACCENT, TEXT_WHITE, TEXT_DIM, SIMULATION_MS, PHOTOS_DIR, REF_W, REF_H, OUTPUT_DIR
 from network_client import NetworkClient
-
 from segmentation_engine import SegmentationEngine
+from theme import BG_PRIMARY, INK_900, GREEN_600, GREEN_500, FONT_SANS, INK_400, BG_CARD
+from ui_components import TopBar, GradientBar
 
 class PreProcessingEngine:
     """Caché global para procesar la segmentación en segundo plano."""
@@ -144,7 +146,7 @@ class ProcessingWorker(QObject):
                 y_pos = REF_H - target_h
                 bg = _overlay_img(bg, user_final, x_pos, y_pos, target_w, target_h)
 
-            # 3. Superponer Jugadores (ORDEN DE CAPA: 0, 2 atrás -> 1, 3 adelante)
+            # 3. Superponer Jugadores
             slots_order = {0: 0, 2: 1, 1: 2, 3: 3}
             sorted_players = sorted(self._players, key=lambda p: slots_order.get(getattr(p, 'slot', 0), 99))
             
@@ -160,13 +162,7 @@ class ProcessingWorker(QObject):
             print(f"[Network] Uploading {final_path} to server...")
             success, qr_data, net_err = NetworkClient.upload_photo(final_path)
             
-            if success:
-                print("[Network] QR received successfully")
-                self.finished.emit(final_path, qr_data)
-            else:
-                print(f"[Network] Upload failed: {net_err}")
-                # Si falla el internet, mostramos la foto sin QR
-                self.finished.emit(final_path, "")
+            self.finished.emit(final_path, qr_data if success else "")
 
         except Exception as e:
             self.error.emit(str(e))
@@ -180,41 +176,79 @@ class SimulationScreen(BaseScreen):
         self._start_processing()
 
     def _build_ui(self):
-        layout = QVBoxLayout()
-        layout.setAlignment(Qt.AlignCenter)
-        self.setLayout(layout)
+        self.setAttribute(Qt.WA_StyledBackground)
+        self.setStyleSheet(f"background-color: {BG_PRIMARY};")
+        layout = QVBoxLayout(self)
+        layout.setContentsMargins(0, 0, 0, 0)
+        layout.setSpacing(0)
 
-        center_widget = QWidget()
-        center_layout = QVBoxLayout(center_widget)
-        center_layout.setAlignment(Qt.AlignCenter)
-        center_layout.setContentsMargins(40, 0, 40, 0)
+        # ── Top Bar ──────────────────────────────────────────────────────────
+        self._top_bar = TopBar()
+        self._top_bar.set_brand_mode()
+        layout.addWidget(self._top_bar)
 
-        title = QLabel("¡SALIENDO\nAL CAMPO!")
-        title.setFont(QFont("Arial Black", 80, QFont.Bold))
-        title.setStyleSheet(f"color: {ACCENT}; background-color: transparent;")
-        title.setAlignment(Qt.AlignCenter)
-        center_layout.addSpacing(100)
-        center_layout.addWidget(title)
+        # ── Main Content ──────────────────────────────────────────────────────
+        content = QWidget()
+        content_layout = QVBoxLayout(content)
+        content_layout.setContentsMargins(40, 60, 40, 60)
+        content_layout.setAlignment(Qt.AlignCenter)
 
-        subtitle = QLabel("Tus ídolos están saltando al césped…")
-        subtitle.setFont(QFont("Arial", 28))
-        subtitle.setStyleSheet(f"color: {TEXT_WHITE}; background-color: transparent;")
-        subtitle.setAlignment(Qt.AlignCenter)
-        center_layout.addSpacing(40)
-        center_layout.addWidget(subtitle)
+        # Subtitle (Small green text)
+        self._subtitle = QLabel("PROCESANDO TU FOTO CON LA IA")
+        self._subtitle.setFont(QFont(FONT_SANS, 10, QFont.Bold))
+        self._subtitle.setStyleSheet(f"color: {GREEN_600}; letter-spacing: 2px;")
+        self._subtitle.setAlignment(Qt.AlignCenter)
+        content_layout.addWidget(self._subtitle)
 
-        center_layout.addSpacing(40)
+        # Main Title
+        self._title = QLabel("¡SALIENDO\nAL CAMPO!")
+        self._title.setFont(QFont(FONT_SANS, 38, QFont.Black))
+        self._title.setStyleSheet(f"color: {INK_900};")
+        self._title.setAlignment(Qt.AlignCenter)
+        content_layout.addWidget(self._title)
+
+        content_layout.addSpacing(40)
+
+        # Progress Container
+        self._progress_container = QWidget()
+        self._progress_container.setFixedWidth(400)
+        self._progress_container.setStyleSheet(f"background: {BG_CARD}; border-radius: 20px;")
+        prog_layout = QVBoxLayout(self._progress_container)
+        prog_layout.setContentsMargins(24, 24, 24, 24)
+
         self._progress = QProgressBar()
-        self._progress.setMaximum(100)
-        self._progress.setValue(0)
-        self._progress.setFixedHeight(12)
+        self._progress.setFixedHeight(8)
         self._progress.setTextVisible(False)
+        self._progress.setRange(0, 100)
+        self._progress.setValue(0)
         self._progress.setStyleSheet(f"""
-            QProgressBar {{ background-color: {TEXT_DIM}; border: none; border-radius: 6px; }}
-            QProgressBar::chunk {{ background-color: {ACCENT}; border-radius: 6px; }}
+            QProgressBar {{
+                background-color: #E8EAE6;
+                border: none;
+                border-radius: 4px;
+            }}
+            QProgressBar::chunk {{
+                background-color: {GREEN_500};
+                border-radius: 4px;
+            }}
         """)
-        center_layout.addWidget(self._progress)
-        layout.addWidget(center_widget)
+        prog_layout.addWidget(self._progress)
+
+        self._status_lbl = QLabel("0%")
+        self._status_lbl.setFont(QFont(FONT_SANS, 11, QFont.Bold))
+        self._status_lbl.setStyleSheet(f"color: {INK_900};")
+        self._status_lbl.setAlignment(Qt.AlignCenter)
+        prog_layout.addWidget(self._status_lbl)
+
+        content_layout.addWidget(self._progress_container, alignment=Qt.AlignCenter)
+        
+        layout.addStretch()
+        layout.addWidget(content)
+        layout.addStretch()
+
+        # ── Bottom Gradient ───────────────────────────────────────────────────
+        self._gradient_bar = GradientBar()
+        layout.addWidget(self._gradient_bar)
 
     def _start_processing(self):
         self._worker = ProcessingWorker(self._photo_path, self._players)
@@ -234,9 +268,11 @@ class SimulationScreen(BaseScreen):
         if self._progress_val < 95:
             self._progress_val += 1
             self._progress.setValue(self._progress_val)
+            self._status_lbl.setText(f"{self._progress_val}%")
 
     def _on_finished(self, result_path, qr_base64):
         self._progress.setValue(100)
+        self._status_lbl.setText("100%")
         QTimer.singleShot(500, lambda: self.app.show_final(result_path, qr_base64))
 
     def _on_error(self, err_msg):
@@ -247,4 +283,16 @@ class SimulationScreen(BaseScreen):
         """Limpieza de hilos antes de cerrar la pantalla."""
         if hasattr(self, "_thread") and self._thread.isRunning():
             self._thread.quit()
-            self._thread.wait(2000) # Esperar hasta 2 segundos
+            self._thread.wait(2000)
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
+        h = self.height()
+        w = self.width()
+
+        if hasattr(self, '_top_bar'):
+            self._top_bar.scale_to(h)
+
+        self._title.setFont(QFont(FONT_SANS, max(24, int(h * 0.045)), QFont.Black))
+        self._subtitle.setFont(QFont(FONT_SANS, max(9, int(h * 0.010)), QFont.Bold))
+        self._progress_container.setFixedWidth(min(500, int(w * 0.8)))
