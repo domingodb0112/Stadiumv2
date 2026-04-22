@@ -147,6 +147,7 @@ class ProcessingWorker(QObject):
                 bg = _overlay_img(bg, user_final, x_pos, y_pos, target_w, target_h)
 
             # 3. Superponer Jugadores (USANDO CACHE FINAL 1080p)
+            VideoOverlayEngine.start_experience(self._players, REF_W, REF_H, paused=True)
             bg = VideoOverlayEngine.apply_all(bg, is_final=True)
 
             final_path = str(OUTPUT_DIR / f"result_{int(_t.time())}.jpg")

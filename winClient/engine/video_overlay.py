@@ -177,7 +177,13 @@ class VideoOverlayEngine:
 
     @classmethod
     def start_experience(cls, player_list, screen_w, screen_h, paused=False):
-        cls._active_slots = [p.slot for p in player_list]
+        # Soportar tanto diccionarios como objetos para los jugadores
+        cls._active_slots = []
+        for p in player_list:
+            slot = p.get('slot') if isinstance(p, dict) else getattr(p, 'slot', None)
+            if slot is not None:
+                cls._active_slots.append(slot)
+                
         for slot in cls._active_slots:
             vp = cls._players[slot]
             vp.idx = 0
@@ -212,10 +218,21 @@ class VideoOverlayEngine:
                 ox1, oy1 = x1 - x, y1 - y
                 ox2, oy2 = x2 - x, y2 - y
                 
-                # LA MAGIA: Cero resize, cero conversiones. Solo sumar y pintar.
-                tmp = frame_bgr[y1:y2, x1:x2].astype(np.uint32) * inv_a[oy1:oy2, ox1:ox2] + fg_pre[oy1:oy2, ox1:ox2]
+                # Obtener ROIs
+                f_roi = fg_pre[oy1:oy2, ox1:ox2]
+                i_roi = inv_a[oy1:oy2, ox1:ox2]
+                b_roi = frame_bgr[y1:y2, x1:x2]
+                
+                # Verificar dimensiones por si acaso
+                if f_roi.shape[:2] != b_roi.shape[:2]:
+                    # Fallback de emergencia: resize del ROI (no debería pasar)
+                    f_roi = cv2.resize(f_roi, (b_roi.shape[1], b_roi.shape[0]), interpolation=cv2.INTER_NEAREST)
+                    i_roi = cv2.resize(i_roi, (b_roi.shape[1], b_roi.shape[0]), interpolation=cv2.INTER_NEAREST)
+
+                tmp = b_roi.astype(np.uint32) * i_roi + f_roi
                 frame_bgr[y1:y2, x1:x2] = (tmp // 255).astype(np.uint8)
-            except: pass
+            except Exception as e:
+                print(f"[Engine] Apply error in slot {slot}: {e}")
                 
         return frame_bgr
 
