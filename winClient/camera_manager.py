@@ -11,8 +11,8 @@ class CameraManager:
         """Obtiene la instancia única de la cámara, abriéndola si es necesario."""
         with cls._lock:
             if cls._cap is None or not cls._cap.isOpened():
-                print("[CameraManager] Powering on hardware for the first time...")
-                cls._cap = cv2.VideoCapture(0)
+                print("[CameraManager] Powering on hardware (DirectShow mode)...")
+                cls._cap = cv2.VideoCapture(0, cv2.CAP_DSHOW)
                 if cls._cap.isOpened():
                     cls._cap.set(cv2.CAP_PROP_FRAME_WIDTH, 1280)
                     cls._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 720)
