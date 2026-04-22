@@ -22,19 +22,20 @@ class WelcomeScreen(BaseScreen):
         center_layout.setSpacing(12)
         center_layout.setAlignment(Qt.AlignCenter)
 
-        # Título
-        title = QLabel("STADIUM AR")
-        title.setFont(QFont("Arial Black", 38, QFont.Bold))
-        title.setStyleSheet(f"color: {TEXT_WHITE};")
-        title.setAlignment(Qt.AlignCenter)
-        center_layout.addWidget(title)
+        # Title
+        title_label = QLabel("BIENVENIDO\nAL JUEGO")
+        title_label.setFont(QFont("Arial Black", 52, QFont.Bold)) # Aumentado
+        title_label.setStyleSheet("color: white;")
+        title_label.setAlignment(Qt.AlignCenter)
+        center_layout.addWidget(title_label)
 
-        # Subtítulo
-        subtitle = QLabel("Vive la experiencia con tus ídolos")
-        subtitle.setFont(QFont("Arial", 15))
-        subtitle.setStyleSheet(f"color: {TEXT_DIM};")
-        subtitle.setAlignment(Qt.AlignCenter)
-        center_layout.addWidget(subtitle)
+        # Subtitle
+        subtitle_label = QLabel("TU HISTORIA COMIENZA AQUÍ")
+        subtitle_label.setFont(QFont("Arial", 28)) # Aumentado
+        subtitle_label.setStyleSheet("color: #10B981;")
+        subtitle_label.setAlignment(Qt.AlignCenter)
+        center_layout.addSpacing(20)
+        center_layout.addWidget(subtitle_label)
 
         center_layout.addSpacing(48)
 

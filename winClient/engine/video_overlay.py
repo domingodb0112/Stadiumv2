@@ -15,7 +15,8 @@ class VideoPlayer:
     """Decodifica frames de un .mov en un hilo de fondo."""
 
     def __init__(self):
-        self.current_frame: np.ndarray | None = None  # BGRA
+        self.current_fg_pre: np.ndarray | None = None  # BGR pre-multiplied
+        self.current_inv_alpha: np.ndarray | None = None # Inverse alpha map
         self.lock          = threading.Lock()
         self.running       = False
         self.ready         = False
@@ -40,7 +41,8 @@ class VideoPlayer:
             self._thread.join(timeout=2.0)
         self._thread = None
         with self.lock:
-            self.current_frame = None
+            self.current_fg_pre = None
+            self.current_inv_alpha = None
             self.ready = False
 
     def _loop(self, path: str):
@@ -73,9 +75,23 @@ class VideoPlayer:
                     decoded = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
 
                     if decoded is not None and decoded.ndim == 3 and decoded.shape[2] == 4:
-                        # cv2.imdecode ya retorna BGRA para PNG con alfa (no necesita conversión)
+                        # Pre-resize
+                        x, y, w, h = self.config
+                        if w > 0 and h > 0:
+                            decoded = cv2.resize(decoded, (w, h), interpolation=cv2.INTER_LINEAR)
+                        
+                        # OPTIMIZACIÓN TURBO: Usamos enteros (uint16) en lugar de decimales
+                        alpha  = decoded[:, :, 3:4].astype(np.uint16)
+                        fg_rgb = decoded[:, :, :3].astype(np.uint16)
+                        
+                        # Pre-multiplicamos el frente por su alfa: 0 - 65025
+                        fg_pre    = fg_rgb * alpha
+                        # Guardamos el alfa inverso para el fondo: 0 - 255
+                        inv_alpha = 255 - alpha
+                        
                         with self.lock:
-                            self.current_frame = decoded
+                            self.current_fg_pre    = fg_pre
+                            self.current_inv_alpha = inv_alpha
                             self.ready = True
 
                     idx += 1
@@ -141,17 +157,16 @@ class VideoOverlayEngine:
         for vp in cls._players:
             if not vp.ready:
                 continue
+            
             with vp.lock:
-                fg = vp.current_frame
-                if fg is None:
+                fg_pre         = vp.current_fg_pre
+                inv_alpha_mask = vp.current_inv_alpha
+                if fg_pre is None or inv_alpha_mask is None:
                     continue
-                fg = fg.copy()
 
             x, y, w, h = vp.config
-            if w <= 0 or h <= 0:
-                continue
-
             fh, fw = frame_bgr.shape[:2]
+            
             # Recortar para no salir de pantalla
             x1, y1 = max(x, 0), max(y, 0)
             x2, y2 = min(x + w, fw), min(y + h, fh)
@@ -159,27 +174,22 @@ class VideoOverlayEngine:
                 continue
 
             try:
-                fg_scaled = cv2.resize(fg, (w, h), interpolation=cv2.INTER_LINEAR)
+                # El frame ya viene pre-redimensionado y pre-multiplicado (Optimización TURBO)
+                overlay_x1, overlay_y1 = x1 - x, y1 - y
+                overlay_x2, overlay_y2 = x2 - x, y2 - y
 
-                # Región visible en pantalla
-                vis_x1, vis_y1 = x1, y1
-                vis_x2, vis_y2 = x2, y2
+                # Extraer ROIs
+                fg_pre_roi    = fg_pre[overlay_y1:overlay_y2, overlay_x1:overlay_x2]
+                inv_alpha_roi = inv_alpha_mask[overlay_y1:overlay_y2, overlay_x1:overlay_x2]
+                bg_roi        = frame_bgr[y1:y2, x1:x2]
 
-                # Región correspondiente en el overlay redimensionado (0,0 = punto x,y del overlay)
-                overlay_x1 = vis_x1 - x
-                overlay_y1 = vis_y1 - y
-                overlay_x2 = vis_x2 - x
-                overlay_y2 = vis_y2 - y
-
-                # Extraer ROIs del mismo tamaño
-                fg_roi = fg_scaled[overlay_y1:overlay_y2, overlay_x1:overlay_x2]
-                bg_roi = frame_bgr[vis_y1:vis_y2, vis_x1:vis_x2].astype(np.float32)
-
-                if fg_roi.shape[0] > 0 and fg_roi.shape[1] > 0:
-                    alpha    = fg_roi[:, :, 3:4] / 255.0
-                    fg_bgr   = fg_roi[:, :, :3].astype(np.float32)
-                    blended  = fg_bgr * alpha + bg_roi * (1.0 - alpha)
-                    frame_bgr[vis_y1:vis_y2, vis_x1:vis_x2] = np.clip(blended, 0, 255).astype(np.uint8)
+                # Formula Turbo (Enteros de 32 bits para evitar desbordamiento):
+                # (Fondo * Alfa_Inverso + Frente_Precalculado) // 255
+                # Esto es MUCHÍSIMO más rápido que usar punto flotante (decimales)
+                tmp = bg_roi.astype(np.uint32) * inv_alpha_roi + fg_pre_roi
+                blended = (tmp // 255).astype(np.uint8)
+                
+                frame_bgr[y1:y2, x1:x2] = blended
             except Exception as e:
                 pass
 

@@ -2,7 +2,6 @@ from PyQt5.QtWidgets import QWidget, QVBoxLayout, QLayout, QSizePolicy
 from PyQt5.QtCore import Qt
 from config import BG
 
-
 class BaseScreen(QWidget):
     """Base class para todas las pantallas."""
 

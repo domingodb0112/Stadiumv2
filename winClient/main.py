@@ -11,11 +11,11 @@ current_dir = Path(__file__).parent.absolute()
 if str(current_dir) not in sys.path:
     sys.path.append(str(current_dir))
 
-from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QLayout
-from PyQt5.QtCore import Qt
-from PyQt5.QtGui import QFont
+from PyQt5.QtWidgets import QApplication, QMainWindow, QStackedWidget, QLayout, QWidget
+from PyQt5.QtCore import Qt, QTimer, QRect
+from PyQt5.QtGui import QFont, QPainter, QColor, QPen
 
-from config import WIN_W, WIN_H, BG
+from config import WIN_W, WIN_H, BG, ACCENT
 from screens.welcome import WelcomeScreen
 from screens.player_selection import PlayerSelectionScreen
 from screens.camera_preview import CameraPreviewScreen
@@ -23,7 +23,6 @@ from screens.photo_view import PhotoViewScreen
 from screens.simulation import SimulationScreen
 from screens.final_screen import FinalScreen
 from screens.loading_screen import LoadingScreen
-
 
 class StadiumApp(QMainWindow):
     """Main application window."""
@@ -40,6 +39,7 @@ class StadiumApp(QMainWindow):
         )
         self.setMinimumSize(360, 640)
         self.resize(WIN_W, WIN_H)
+        self.showFullScreen()
 
         # Central widget: stacked widget para cambiar entre pantallas
         self.stacked = QStackedWidget()
@@ -51,6 +51,9 @@ class StadiumApp(QMainWindow):
 
         # Mostrar pantalla de bienvenida
         self.show_welcome()
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
 
     def _clear_stacked(self):
         """Eliminar todos los widgets del stacked widget."""

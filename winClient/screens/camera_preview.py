@@ -4,16 +4,16 @@ Camera preview screen for PyQt5 — optimized for high speed.
 import cv2
 import numpy as np
 import threading
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QSizePolicy, QGridLayout, QWidget
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QPixmap, QImage, QCursor
 
-from screens.base_screen import BaseScreen
-from engine.video_overlay import VideoOverlayEngine
 from config import (
     BG, TEXT_WHITE, ACCENT,
     WIN_W, WIN_H, COUNTDOWN_SEC, REF_W, REF_H, OUTPUT_DIR
 )
+from screens.base_screen import BaseScreen
+from engine.video_overlay import VideoOverlayEngine
 
 
 class CameraPreviewScreen(BaseScreen):
@@ -39,13 +39,37 @@ class CameraPreviewScreen(BaseScreen):
         main_layout.setContentsMargins(0, 0, 0, 0)
         main_layout.setSpacing(0)
 
-        # Video canvas
+        # Viewport container (centered with margins)
+        self._viewport = QWidget()
+        self._viewport.setStyleSheet("background-color: transparent;")
+        
+        # Grid layout allows stacking widgets on top of each other in the same cell
+        self._view_layout = QGridLayout(self._viewport)
+        self._view_layout.setContentsMargins(0, 0, 0, 0)
+        self._view_layout.setSpacing(0)
+
+        # Video canvas (bottom layer)
         self._canvas = QLabel()
-        self._canvas.setMinimumSize(WIN_W, WIN_H)
-        self._canvas.setMaximumSize(WIN_W, WIN_H)
         self._canvas.setAlignment(Qt.AlignCenter)
-        self._canvas.setStyleSheet(f"background-color: {BG};")
-        main_layout.addWidget(self._canvas)
+        self._canvas.setStyleSheet("background-color: #000; border: none;") 
+        self._canvas.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Expanding)
+        self._view_layout.addWidget(self._canvas, 0, 0)
+        
+        # Countdown label (overlay layer)
+        self._lbl_countdown = QLabel("")
+        self._lbl_countdown.setFont(QFont("Arial Black", 180, QFont.Bold))
+        self._lbl_countdown.setStyleSheet(
+            "QLabel { color:white; background-color:transparent; }"
+        )
+        self._lbl_countdown.setAlignment(Qt.AlignCenter)
+        self._lbl_countdown.setAttribute(Qt.WA_TransparentForMouseEvents)
+        self._lbl_countdown.hide()
+        self._view_layout.addWidget(self._lbl_countdown, 0, 0)
+
+        # Main layout con espaciado balanceado
+        main_layout.addSpacing(100)
+        main_layout.addWidget(self._viewport, 1) 
+        main_layout.addSpacing(80)
 
         # Back button
         self._back_btn = QPushButton("←")
@@ -58,14 +82,7 @@ class CameraPreviewScreen(BaseScreen):
         self._back_btn.setCursor(QCursor(Qt.PointingHandCursor))
         self._back_btn.clicked.connect(self._on_back)
 
-        # Countdown label
-        self._lbl_countdown = QLabel("")
-        self._lbl_countdown.setFont(QFont("Arial", 150, QFont.Bold))
-        self._lbl_countdown.setStyleSheet(
-            "QLabel { color:white; background-color:transparent; }"
-        )
-        self._lbl_countdown.setAlignment(Qt.AlignCenter)
-        self._lbl_countdown.hide()
+        # (Deleted duplicate countdown label creation)
 
         # Capture button
         self._btn_capture = QPushButton("📷 CAPTURAR")
@@ -85,7 +102,6 @@ class CameraPreviewScreen(BaseScreen):
         capture_row.addStretch()
         capture_row.setContentsMargins(0, 32, 0, 32)
 
-        main_layout.addWidget(self._lbl_countdown)
         main_layout.addLayout(capture_row)
         self.setLayout(main_layout)
 
@@ -126,8 +142,16 @@ class CameraPreviewScreen(BaseScreen):
         if not ret:
             return
 
-        # 1. Resize para el preview de la ventana (Rápido)
-        preview_frame = cv2.resize(frame, (WIN_W, WIN_H))
+        # INTERNAL SCALING: Renderizamos a 720p para ganar 30+ FPS.
+        PREVIEW_W = 720
+        PREVIEW_H = 1280
+        
+        # Sincronizar motor de video con la resolución reducida
+        if not hasattr(self, "_last_res") or self._last_res != (PREVIEW_W, PREVIEW_H):
+            VideoOverlayEngine.start_experience(self._players, PREVIEW_W, PREVIEW_H)
+            self._last_res = (PREVIEW_W, PREVIEW_H)
+
+        preview_frame = cv2.resize(frame, (PREVIEW_W, PREVIEW_H))
 
         if self._capture_pending:
             self._capture_pending = False
@@ -143,7 +167,14 @@ class CameraPreviewScreen(BaseScreen):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
         h, w, ch = rgb.shape
         qt_img  = QImage(rgb.data, w, h, ch * w, QImage.Format_RGB888)
-        self._canvas.setPixmap(QPixmap.fromImage(qt_img))
+        pixmap = QPixmap.fromImage(qt_img)
+        # Escalar al tamaño actual del canvas manteniendo aspecto
+        scaled_pixmap = pixmap.scaled(
+            self._canvas.size(),
+            Qt.KeepAspectRatio,
+            Qt.SmoothTransformation
+        )
+        self._canvas.setPixmap(scaled_pixmap)
 
     # ── Countdown ─────────────────────────────────────────────────────────────
 
@@ -183,6 +214,9 @@ class CameraPreviewScreen(BaseScreen):
         self.app.show_photo_view(path, self._players)
 
     # ── Navigation / cleanup ──────────────────────────────────────────────────
+
+    def resizeEvent(self, event):
+        super().resizeEvent(event)
 
     def _on_back(self):
         self.app.show_player_selection()

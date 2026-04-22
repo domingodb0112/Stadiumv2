@@ -88,7 +88,7 @@ class FinalScreen(QWidget):
         self._overlay.setGeometry(0, 0, w, h)
 
         # Scale QR image
-        qr_size = int(h * 0.20)   # 20 % of height
+        qr_size = int(h * 0.35)   # Aumentado de 20% a 35%
         if self._qr_pixmap and not self._qr_pixmap.isNull():
             scaled = self._qr_pixmap.scaled(
                 QSize(qr_size, qr_size), Qt.KeepAspectRatio, Qt.SmoothTransformation
@@ -107,10 +107,10 @@ class FinalScreen(QWidget):
         """)
 
         # Adaptive fonts
-        self._scan_lbl.setFont(QFont("Arial", _fs(h, 0.016), QFont.Bold))
+        self._scan_lbl.setFont(QFont("Arial", _fs(h, 0.032), QFont.Bold)) # Duplicado ratio
 
-        btn_font_size = _fs(h, 0.022)
-        btn_h = int(h * 0.07)
+        btn_font_size = _fs(h, 0.044) # Duplicado ratio
+        btn_h = int(h * 0.12) # Aumentado
         btn_w = int(w * 0.55)
         btn_radius = btn_h // 2
         self._btn.setMinimumSize(btn_w, btn_h)
@@ -135,13 +135,21 @@ class FinalScreen(QWidget):
 
     def paintEvent(self, event):
         painter = QPainter(self)
+        painter.setRenderHint(QPainter.Antialiasing)
         painter.setRenderHint(QPainter.SmoothPixmapTransform)
+        
+        # Fondo oscuro para las barras laterales
+        painter.fillRect(self.rect(), QColor(12, 12, 12))
+        
         if self._bg_pixmap and not self._bg_pixmap.isNull():
+            # ESCALADO CENTRADO (Vertical 1080x1920)
             scaled = self._bg_pixmap.scaled(
-                self.size(), Qt.KeepAspectRatioByExpanding, Qt.SmoothTransformation
+                self.size(), Qt.KeepAspectRatio, Qt.SmoothTransformation
             )
             x = (self.width()  - scaled.width())  // 2
             y = (self.height() - scaled.height()) // 2
+            
+            # Dibujar la foto
             painter.drawPixmap(x, y, scaled)
         else:
             painter.fillRect(self.rect(), QColor(0, 0, 0))
@@ -158,6 +166,7 @@ class FinalScreen(QWidget):
             self.update()
 
         if _HAS_QR and qr_base64:
+            from qr_service import QRService
             raw = QRService.base64_to_pixmap(qr_base64, max_size=512)
             if raw:
                 self._qr_pixmap = raw

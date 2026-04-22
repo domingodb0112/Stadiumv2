@@ -24,17 +24,17 @@ class LoadingScreen(BaseScreen):
 
         # Título
         title = QLabel("PREPARANDO CÁMARA...")
-        title.setFont(QFont("Arial Black", 32, QFont.Bold))
+        title.setFont(QFont("Arial Black", 52, QFont.Bold)) # Aumentado
         title.setStyleSheet(f"color: {ACCENT};")
         title.setAlignment(Qt.AlignCenter)
         layout.addWidget(title)
 
         # Subtítulo
         subtitle = QLabel("Ajustando luces y sombras para tu mejor perfil.")
-        subtitle.setFont(QFont("Arial", 14))
+        subtitle.setFont(QFont("Arial", 26)) # Aumentado
         subtitle.setStyleSheet(f"color: {TEXT_WHITE};")
         subtitle.setAlignment(Qt.AlignCenter)
-        layout.addSpacing(20)
+        layout.addSpacing(40)
         layout.addWidget(subtitle)
 
         # Barra animada (Indeterminada)

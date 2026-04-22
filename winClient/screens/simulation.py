@@ -103,8 +103,42 @@ class ProcessingWorker(QObject):
                 try:
                     engine = SegmentationEngine()
                     mask = engine.process(user_raw)
-                    # Aplicar recorte
-                    bg = apply_mask(user_raw, bg, mask, blur_kernel=5)
+                    
+                    # OPTIMIZACIÓN DE TAMAÑO: Escalar la persona a 1440px de altura (3/4 de la pantalla)
+                    coords = cv2.findNonZero(mask)
+                    if coords is not None:
+                        x_b, y_b, w_b, h_b = cv2.boundingRect(coords)
+                        if h_b > 0:
+                            # Factor para que la persona mida 1728px de alto (9/10 de la pantalla)
+                            target_h = 1728
+                            scale = target_h / h_b
+                            
+                            # Redimensionar el original y la máscara
+                            new_w = int(REF_W * scale)
+                            new_h = int(REF_H * scale)
+                            user_scaled = cv2.resize(user_raw, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
+                            mask_scaled = cv2.resize(mask, (new_w, new_h), interpolation=cv2.INTER_LANCZOS4)
+                            
+                            # Shift para centrar y pegar a la base
+                            # Nueva posición de la base de la persona
+                            base_y_scaled = (y_b + h_b) * scale
+                            offset_y = REF_H - int(base_y_scaled)
+                            
+                            # Nueva posición horizontal (centro)
+                            center_x_scaled = (x_b + w_b/2) * scale
+                            offset_x = (REF_W / 2) - center_x_scaled
+                            
+                            # Aplicar transformación
+                            M = np.float32([[1, 0, offset_x], [0, 1, offset_y]])
+                            user_final = cv2.warpAffine(user_scaled, M, (REF_W, REF_H))
+                            mask_final = cv2.warpAffine(mask_scaled, M, (REF_W, REF_H))
+                            
+                            bg = apply_mask(user_final, bg, mask_final, blur_kernel=5)
+                        else:
+                            bg = apply_mask(user_raw, bg, mask, blur_kernel=5)
+                    else:
+                        bg = apply_mask(user_raw, bg, mask, blur_kernel=5)
+                        
                     engine.release()
                 except Exception as e:
                     # Si falla IA, pegamos al usuario tal cual sobre el fondo
@@ -167,19 +201,18 @@ class SimulationScreen(BaseScreen):
         center_layout.setContentsMargins(40, 0, 40, 0)
 
         # Título: "¡SALIENDO AL CAMPO!"
-        title = QLabel("¡SALIENDO AL CAMPO!")
-        title_font = QFont("Arial Black", 40, QFont.Bold)
+        title = QLabel("¡SALIENDO\nAL CAMPO!")
+        title_font = QFont("Arial Black", 80, QFont.Bold) # Duplicado
         title.setFont(title_font)
         title.setStyleSheet(f"color: {ACCENT}; background-color: transparent;")
         title.setAlignment(Qt.AlignCenter)
         center_layout.addSpacing(100)
         center_layout.addWidget(title)
-
         # Subtítulo
         subtitle = QLabel(
-            "Tus ídolos están saltando al césped…\nPreparando el encuentro histórico."
+            "Tus ídolos están\nsaltando al césped…\nPreparando el encuentro\nhistórico."
         )
-        subtitle_font = QFont("Arial", 14)
+        subtitle_font = QFont("Arial", 28) # Duplicado
         subtitle.setFont(subtitle_font)
         subtitle.setStyleSheet(f"color: {TEXT_WHITE}; background-color: transparent;")
         subtitle.setAlignment(Qt.AlignCenter)
@@ -206,9 +239,9 @@ class SimulationScreen(BaseScreen):
         center_layout.addWidget(self._progress)
 
         # Label de estado
-        center_layout.addSpacing(12)
+        center_layout.addSpacing(24)
         self._status_label = QLabel("6 segundos para la gloria…")
-        status_font = QFont("Arial", 11)
+        status_font = QFont("Arial", 22) # Duplicado
         self._status_label.setFont(status_font)
         self._status_label.setStyleSheet(f"color: {TEXT_DIM}; background-color: transparent;")
         self._status_label.setAlignment(Qt.AlignCenter)

@@ -117,12 +117,12 @@ def _pil_to_qpixmap(pil_img):
 
 # ── Card ──────────────────────────────────────────────────────────────────────
 
-_CARD_W        = 140
-_CARD_H        = 162
-_IMG_SIZE      = 110
-_RADIUS        = 14
-_SPINNER_GAP   = 2                                        # px between portrait edge and arc centre-line
-_SPINNER_SIZE  = _IMG_SIZE + 2 * (_SPINNER_GAP + _SPINNER_WIDTH)  # widget bbox that encircles portrait
+_CARD_W        = 340 # Aumentado significativamente
+_CARD_H        = 400 # Aumentado significativamente
+_IMG_SIZE      = 280 # Aumentado significativamente
+_RADIUS        = 24
+_SPINNER_GAP   = 4   
+_SPINNER_SIZE  = _IMG_SIZE + 2 * (_SPINNER_GAP + _SPINNER_WIDTH)
 
 
 class PlayerCardFrame(QFrame):
@@ -156,7 +156,7 @@ class PlayerCardFrame(QFrame):
         # Name
         self._name_label = QLabel(player.name, self)
         self._name_label.setAlignment(Qt.AlignCenter)
-        self._name_label.setFont(QFont("Arial", 12, QFont.Bold))
+        self._name_label.setFont(QFont("Arial", 18, QFont.Bold)) # Letra más grande
         self._name_label.setWordWrap(True)
         self._name_label.setStyleSheet(
             f"color: {TEXT_WHITE}; background: transparent; border: none;"
@@ -223,14 +223,14 @@ class PlayerSelectionScreen(BaseScreen):
 
         # ── Header ────────────────────────────────────────────────────────
         self._title = QLabel("ELIGE TUS JUGADORES")
-        self._title.setFont(QFont("Arial Black", 22, QFont.Bold))
+        self._title.setFont(QFont("Arial Black", 80, QFont.Bold)) # Aumentado
         self._title.setStyleSheet(f"color: {TEXT_WHITE};")
         self._title.setAlignment(Qt.AlignCenter)
         self._title.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
         main_layout.addWidget(self._title)
 
         self._subtitle = QLabel("Selecciona los jugadores que aparecerán en tu foto")
-        self._subtitle.setFont(QFont("Arial", 13))
+        self._subtitle.setFont(QFont("Arial", 28)) # Aumentado
         self._subtitle.setStyleSheet(f"color: {TEXT_DIM};")
         self._subtitle.setAlignment(Qt.AlignCenter)
         self._subtitle.setSizePolicy(QSizePolicy.Expanding, QSizePolicy.Preferred)
@@ -265,8 +265,8 @@ class PlayerSelectionScreen(BaseScreen):
 
         # ── Continue button ───────────────────────────────────────────────
         self._btn_continue = QPushButton("CONTINUAR")
-        self._btn_continue.setFont(QFont("Arial Black", 16, QFont.Bold))
-        self._btn_continue.setMinimumSize(240, 56)
+        self._btn_continue.setFont(QFont("Arial", 36, QFont.Bold)) # Aumentado
+        self._btn_continue.setMinimumSize(500, 120) # Más grande
         self._btn_continue.setSizePolicy(QSizePolicy.Preferred, QSizePolicy.Preferred)
         self._btn_continue.setEnabled(False)
         self._btn_continue.clicked.connect(self._on_continue)

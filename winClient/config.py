@@ -1,8 +1,8 @@
 from pathlib import Path
 
 # ── Ventana ───────────────────────────────────────────────────────────────────
-WIN_W = 540
-WIN_H = 960
+WIN_W = 1080
+WIN_H = 1920
 
 # ── Resolución de referencia (igual que Android) ─────────────────────────────
 REF_W = 1080
