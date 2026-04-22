@@ -119,6 +119,9 @@ class ProcessingWorker(QObject):
             cancha_path = str(PHOTOS_DIR / "cancha.png")
             cancha_img = VideoOverlayEngine.get_cached_image(cancha_path)
             if cancha_img is not None:
+                # Forzar 3 canales (BGR) para evitar errores de shape con los jugadores
+                if cancha_img.shape[2] == 4:
+                    cancha_img = cv2.cvtColor(cancha_img, cv2.COLOR_BGRA2BGR)
                 bg = cv2.resize(cancha_img, (REF_W, REF_H))
             else:
                 bg = np.zeros((REF_H, REF_W, 3), dtype=np.uint8)

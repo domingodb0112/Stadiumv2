@@ -13,7 +13,7 @@ class VideoPlayer:
     """Maneja la reproducción de frames pre-calculados en DUAL-CACHE (Preview/Final)."""
 
     def __init__(self):
-        # Cache para el Preview (720p)
+        # Cache para el Preview (540p)
         self.curr_fg_pre_pv: np.ndarray | None = None
         self.curr_inv_pv: np.ndarray | None = None
         
@@ -31,9 +31,11 @@ class VideoPlayer:
         self.config_pv     = (0, 0, 0, 0)
         self.config_final  = (0, 0, 0, 0)
         self.idx           = 0
+        self.path          = ""
 
     def start(self, path: str, looping: bool = False):
         self.stop()
+        self.path     = path
         self.looping  = looping
         self.finished = False
         self.ready    = False
@@ -125,9 +127,10 @@ class VideoOverlayEngine:
             path = f"assets/videos/{p['video_name']}"
             from pathlib import Path
             abs_path = str(Path(path).absolute())
+            
             if path not in cls._video_cache and os.path.exists(abs_path):
                 print(f"[Engine] HYPER-CACHING (Dual-Scale) from: {abs_path}")
-                frames_meta, fps = parse_mov(path)
+                frames_meta, fps = parse_mov(abs_path)
                 
                 # Tamaño Final (1080p)
                 fw, fh = p['w'], p['h']
@@ -135,7 +138,7 @@ class VideoOverlayEngine:
                 pw, ph = int(fw * PV_SCALE_W), int(fh * PV_SCALE_H)
                 
                 dual_data = []
-                with open(path, 'rb') as f:
+                with open(abs_path, 'rb') as f:
                     for offset, size in frames_meta:
                         f.seek(offset)
                         buf = f.read(size)
@@ -201,21 +204,31 @@ class VideoOverlayEngine:
 
     @classmethod
     def apply_all(cls, frame_bgr: np.ndarray, is_final=False) -> np.ndarray:
-        """Mezcla ultra veloz. Detecta automáticamente si es preview o foto final."""
+        """Mezcla ultra veloz. En modo Final, usa la RAM directamente sin depender de hilos."""
         fh, fw = frame_bgr.shape[:2]
         
         for slot in [0, 2, 1, 3]:
             if slot not in cls._active_slots: continue
             vp = cls._players[slot]
-            if not vp.ready: continue
             
-            with vp.lock:
-                if is_final:
-                    fg_pre, inv_a = vp.curr_fg_pre_final, vp.curr_inv_final
+            fg_pre, inv_a = None, None
+            x, y, w, h = 0, 0, 0, 0
+            
+            if is_final:
+                # USAR EL ÚLTIMO FRAME (POSE FINAL) PARA LA FOTO
+                if vp.path in cls._video_cache:
+                    dual_data, _ = cls._video_cache[vp.path]
+                    # Tomar el ÚLTIMO frame del cache
+                    last_idx = len(dual_data) - 1
+                    _, f_entry = dual_data[last_idx]
+                    fg_pre, inv_a = f_entry
                     x, y, w, h = vp.config_final
-                else:
-                    fg_pre, inv_a = vp.curr_fg_pre_pv, vp.curr_inv_pv
-                    x, y, w, h = vp.config_pv
+            else:
+                # Modo Preview: Usar lo que el hilo tenga listo
+                if vp.ready:
+                    with vp.lock:
+                        fg_pre, inv_a = vp.curr_fg_pre_pv, vp.curr_inv_pv
+                        x, y, w, h = vp.config_pv
             
             if fg_pre is None: continue
             
@@ -227,14 +240,11 @@ class VideoOverlayEngine:
                 ox1, oy1 = x1 - x, y1 - y
                 ox2, oy2 = x2 - x, y2 - y
                 
-                # Obtener ROIs
                 f_roi = fg_pre[oy1:oy2, ox1:ox2]
                 i_roi = inv_a[oy1:oy2, ox1:ox2]
                 b_roi = frame_bgr[y1:y2, x1:x2]
                 
-                # Verificar dimensiones por si acaso
                 if f_roi.shape[:2] != b_roi.shape[:2]:
-                    # Fallback de emergencia: resize del ROI (no debería pasar)
                     f_roi = cv2.resize(f_roi, (b_roi.shape[1], b_roi.shape[0]), interpolation=cv2.INTER_NEAREST)
                     i_roi = cv2.resize(i_roi, (b_roi.shape[1], b_roi.shape[0]), interpolation=cv2.INTER_NEAREST)
 
