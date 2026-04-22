@@ -27,9 +27,13 @@ class SegmentationEngine:
             raise RuntimeError(f"Model download failed: {e}")
 
     def _init_segmenter(self) -> None:
+        # Forzar CPU Delegate para máxima compatibilidad (evita fallos de GPU en Windows)
         base_options = mp.tasks.BaseOptions(
-            model_asset_path=str(self.model_path)
+            model_asset_path=str(self.model_path),
+            delegate=mp.tasks.BaseOptions.Delegate.CPU
         )
+        print("[Seg] Using CPU Delegate (Compatibility Mode)")
+
         options = mp.tasks.vision.ImageSegmenterOptions(
             base_options=base_options,
             output_category_mask=True,
@@ -39,26 +43,38 @@ class SegmentationEngine:
         )
 
     def process(self, frame: np.ndarray) -> np.ndarray:
-        rgb_frame = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
+        # IA a resolución controlada
+        h, w = frame.shape[:2]
+        small_frame = cv2.resize(frame, (512, 512), interpolation=cv2.INTER_LINEAR)
+        
+        rgb_frame = cv2.cvtColor(small_frame, cv2.COLOR_BGR2RGB)
         mp_image = mp.Image(image_format=mp.ImageFormat.SRGB, data=rgb_frame)
 
         result = self.segmenter.segment(mp_image)
 
+        # Extraer la máscara (Priorizando category_mask que es más estable en Windows)
         mask_view = None
-        if hasattr(result, 'confidence_masks') and result.confidence_masks:
-            mask_view = result.confidence_masks[0].numpy_view()
-        elif hasattr(result, 'category_mask') and result.category_mask:
+        if hasattr(result, 'category_mask') and result.category_mask:
             mask_view = result.category_mask.numpy_view()
-        else:
-            print(f"[!] Unknown result structure. Available attributes:")
-            for attr in dir(result):
-                if not attr.startswith('_'):
-                    print(f"    - {attr}")
-            raise AttributeError("Cannot extract mask from segmentation result")
+        elif hasattr(result, 'confidence_masks') and result.confidence_masks:
+            mask_view = result.confidence_masks[0].numpy_view()
+        
+        if mask_view is None:
+            return np.zeros((h, w), dtype=np.uint8)
 
-        mask = (mask_view > 0.5).astype(np.uint8) * 255
-        self._mask_cache = mask
-        return mask
+        # MediaPipe Selfie Segmenter: 
+        # Si es category_mask: 0=background, 1=person (generalmente)
+        # Si es confidence_masks: valores cercanos a 1.0 = persona
+        if mask_view.dtype == np.uint8:
+            # Invertimos: Ahora 0 es la persona (ajustado para que no salga invertido)
+            mask = (mask_view == 0).astype(np.uint8) * 255
+        else:
+            # Invertimos: Valores bajos = persona
+            mask = (mask_view < 0.4).astype(np.uint8) * 255
+
+        full_mask = cv2.resize(mask, (w, h), interpolation=cv2.INTER_LINEAR)
+        self._mask_cache = full_mask
+        return full_mask
 
     def get_mask(self) -> Optional[np.ndarray]:
         return self._mask_cache

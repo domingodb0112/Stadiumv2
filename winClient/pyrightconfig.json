@@ -1,7 +1,0 @@
-{
-  "include": ["."],
-  "pythonVersion": "3.14",
-  "pythonPath": ".",
-  "typeCheckingMode": "basic",
-  "ignore": ["__pycache__", "venv"]
-}

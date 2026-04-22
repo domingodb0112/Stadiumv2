@@ -1,25 +1,23 @@
 """
-Camera preview screen for PyQt5 — with MediaPipe selfie segmentation.
+Camera preview screen for PyQt5 — optimized for high speed.
 """
 import cv2
 import numpy as np
-from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton, QWidget
+import threading
+from PyQt5.QtWidgets import QVBoxLayout, QHBoxLayout, QLabel, QPushButton
 from PyQt5.QtCore import Qt, QTimer
 from PyQt5.QtGui import QFont, QPixmap, QImage, QCursor
 
 from screens.base_screen import BaseScreen
 from engine.video_overlay import VideoOverlayEngine
-from segmentation_engine import SegmentationEngine, apply_mask
 from config import (
-    BG, TEXT_WHITE, ACCENT, BTN_DARK,
-    WIN_W, WIN_H, COUNTDOWN_SEC, REF_W, REF_H, OUTPUT_DIR, PHOTOS_DIR,
+    BG, TEXT_WHITE, ACCENT,
+    WIN_W, WIN_H, COUNTDOWN_SEC, REF_W, REF_H, OUTPUT_DIR
 )
-
-_BG_PATH = str(PHOTOS_DIR / "cancha.png")
 
 
 class CameraPreviewScreen(BaseScreen):
-    """Pantalla de cámara en vivo con segmentación de fondo y overlays."""
+    """Pantalla de cámara en vivo con carga asíncrona para evitar lag."""
 
     def __init__(self, app, players, **kwargs):
         super().__init__(app, **kwargs)
@@ -31,43 +29,8 @@ class CameraPreviewScreen(BaseScreen):
         self._photo_frame    = None
         self._capture_pending = False
 
-        # Segmentation
-        self._seg   = None
-        self._bg_cv = None
-        self._init_segmentation()
-
         self._build_ui()
         self._start_camera()
-
-    # ── Segmentation setup ────────────────────────────────────────────────────
-
-    def _init_segmentation(self):
-        try:
-            self._seg = SegmentationEngine()
-            bg = cv2.imread(_BG_PATH)
-            if bg is not None:
-                self._bg_cv = bg          # resized lazily on first frame
-            else:
-                print(f"[Seg] Background not found: {_BG_PATH}")
-        except Exception as e:
-            print(f"[Seg] Init failed — running without segmentation: {e}")
-            self._seg = None
-
-    def _segment(self, frame: np.ndarray) -> np.ndarray:
-        """Returns frame composited over stadium background, or raw frame on error."""
-        if self._seg is None or self._bg_cv is None:
-            return frame
-        try:
-            h, w = frame.shape[:2]
-            bg = self._bg_cv
-            if bg.shape[:2] != (h, w):
-                bg = cv2.resize(bg, (w, h))
-                self._bg_cv = bg           # cache resized copy
-            mask = self._seg.process(frame)
-            return apply_mask(frame, bg, mask)
-        except Exception as e:
-            print(f"[Seg] Frame error: {e}")
-            return frame
 
     # ── UI ────────────────────────────────────────────────────────────────────
 
@@ -129,48 +92,52 @@ class CameraPreviewScreen(BaseScreen):
     # ── Camera loop ───────────────────────────────────────────────────────────
 
     def _start_camera(self):
-        self._cap = cv2.VideoCapture(0)
-        if self._cap.isOpened():
-            self._cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1080)
-            self._cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
-
-        VideoOverlayEngine.start_experience(self._players, WIN_W, WIN_H)
-
+        """Inicia la cámara y los videos en un hilo de fondo para evitar congelar la UI."""
         self._running = True
         self._timer = QTimer()
         self._timer.timeout.connect(self._capture_frame)
         self._timer.start(33)   # ~30 FPS
 
+        # Lanzar inicialización pesada en segundo plano
+        threading.Thread(target=self._init_hardware_async, daemon=True).start()
+
+    def _init_hardware_async(self):
+        """Apertura real de cámara y carga de videos (corre en background)."""
+        try:
+            # 1. Abrir Cámara
+            cap = cv2.VideoCapture(0)
+            if cap.isOpened():
+                cap.set(cv2.CAP_PROP_FRAME_WIDTH,  1080)
+                cap.set(cv2.CAP_PROP_FRAME_HEIGHT, 1920)
+                self._cap = cap
+                print("[Camera] Hardware ready")
+            
+            # 2. Iniciar Overlays
+            VideoOverlayEngine.start_experience(self._players, WIN_W, WIN_H)
+        except Exception as e:
+            print(f"[Camera] Async init error: {e}")
+
     def _capture_frame(self):
-        if not self._running or not self._cap or not self._cap.isOpened():
+        if not self._running or self._cap is None or not self._cap.isOpened():
+            # Si la cámara aún no abre o falló, mostrar fondo negro
             return
 
         ret, frame = self._cap.read()
         if not ret:
             return
 
-        # 1. Resize to display resolution
-        frame = cv2.resize(frame, (WIN_W, WIN_H))
+        # 1. Resize para el preview de la ventana (Rápido)
+        preview_frame = cv2.resize(frame, (WIN_W, WIN_H))
 
-        # 2. Segmentation — replace background with stadium
-        frame = self._segment(frame)
-
-        # 3. Video overlays on top (player cards, animations)
-        frame = VideoOverlayEngine.apply_all(frame)
-
-        # 4. HD capture snapshot when triggered
         if self._capture_pending:
             self._capture_pending = False
-            ret2, hd = self._cap.read()
-            if ret2:
-                hd = cv2.resize(hd, (WIN_W, WIN_H))
-                hd = self._segment(hd)
-                hd = VideoOverlayEngine.apply_all(hd)
-                self._photo_frame = cv2.resize(hd, (REF_W, REF_H))
-            else:
-                self._photo_frame = cv2.resize(frame, (REF_W, REF_H))
+            # CAPTURA RAW: Guardamos la foto limpia de la cámara para procesar después
+            self._photo_frame = cv2.resize(frame, (REF_W, REF_H))
+            preview_frame = VideoOverlayEngine.apply_all(preview_frame)
+        else:
+            preview_frame = VideoOverlayEngine.apply_all(preview_frame)
 
-        self._update_canvas(frame)
+        self._update_canvas(preview_frame)
 
     def _update_canvas(self, frame: np.ndarray):
         rgb = cv2.cvtColor(frame, cv2.COLOR_BGR2RGB)
@@ -228,6 +195,4 @@ class CameraPreviewScreen(BaseScreen):
             self._countdown_timer.stop()
         if self._cap:
             self._cap.release()
-        if self._seg:
-            self._seg.release()
         VideoOverlayEngine.stop_all()

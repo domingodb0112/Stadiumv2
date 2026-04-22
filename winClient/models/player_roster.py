@@ -1,17 +1,13 @@
 """
 player_roster.py
-Catálogo de jugadores — equivalente a PlayerRoster.java + Player.java de Android.
-
-Para ajustar posiciones edita los valores x, y, w, h de cada jugador.
-Resolución de referencia: 1080 x 1920 px.
-
-  Player(id, nombre, imagen.png, video.mov, slot, x, y, w, h)
-  x=0, y=0, w=1080, h=1920  →  ocupa toda la pantalla
+Carga el catálogo de jugadores desde un archivo JSON externo.
 """
+import json
 from pathlib import Path
 from dataclasses import dataclass
+from typing import List, Optional
 
-from config import VIDEOS_DIR, PHOTOS_DIR, REF_W, REF_H
+from config import VIDEOS_DIR, PHOTOS_DIR, ASSETS_DIR
 
 
 @dataclass
@@ -28,19 +24,50 @@ class Player:
     selected:   bool = False
 
 
-#                           id  nombre            imagen                              video                slot   x   y      w     h
-ALL: list[Player] = [
-    Player(0, "Gilberto Mora",  PHOTOS_DIR / "gilbertoMoraGm.png",  VIDEOS_DIR / "gilbertoMora.mov",  0,  0,  0, 1080, 1920),
-    Player(1, "Jorge Sánchez",  PHOTOS_DIR / "jorgeSanchezGm.png",  VIDEOS_DIR / "jorgeSanchez.mov",  1,  0,  0, 1080, 1920),
-    Player(2, "Mateo Chávez",   PHOTOS_DIR / "mateoChavezGm.png",   VIDEOS_DIR / "mateoChavez.mov",   2,  0,  0, 1080, 1920),
-    Player(3, "Raúl Rangel",    PHOTOS_DIR / "raulRangelGm.png",    VIDEOS_DIR / "raulRangel.mov",    3,  0,  0, 1080, 1920),
-]
+def _load_players() -> List[Player]:
+    json_path = ASSETS_DIR / "players.json"
+    if not json_path.exists():
+        print(f"[!] players.json not found at {json_path}")
+        return []
+
+    try:
+        with open(json_path, "r", encoding="utf-8") as f:
+            data = json.load(f)
+        
+        roster = []
+        for item in data:
+            p = Player(
+                id=item["id"],
+                name=item["name"],
+                image_path=PHOTOS_DIR / item["image_name"],
+                video_path=VIDEOS_DIR / item["video_name"],
+                slot=item["slot"],
+                x=item["x"],
+                y=item["y"],
+                w=item["w"],
+                h=item["h"]
+            )
+            roster.append(p)
+        return roster
+    except Exception as e:
+        print(f"[!] Error loading players.json: {e}")
+        return []
 
 
-def find_by_slot(slot: int) -> Player | None:
+# Carga inicial del catálogo
+ALL: List[Player] = _load_players()
+
+
+def find_by_slot(slot: int) -> Optional[Player]:
     return next((p for p in ALL if p.slot == slot), None)
 
 
 def reset_selection():
     for p in ALL:
         p.selected = False
+
+
+def refresh_roster():
+    """Recarga el catálogo desde el JSON (útil para actualizaciones en caliente)."""
+    global ALL
+    ALL = _load_players()

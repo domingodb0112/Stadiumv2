@@ -20,8 +20,11 @@ class QRService:
             QPixmap o None si hay error.
         """
         try:
-            # Limpiar Base64 (remover espacios, saltos de línea)
-            base64_clean = base64_string.strip()
+            # Limpiar Base64 (remover prefijo data:image/...;base64, si existe)
+            if "," in base64_string:
+                base64_clean = base64_string.split(",")[1].strip()
+            else:
+                base64_clean = base64_string.strip()
 
             # Decodificar Base64 a bytes
             image_bytes = base64.b64decode(base64_clean)

@@ -22,6 +22,7 @@ from screens.camera_preview import CameraPreviewScreen
 from screens.photo_view import PhotoViewScreen
 from screens.simulation import SimulationScreen
 from screens.final_screen import FinalScreen
+from screens.loading_screen import LoadingScreen
 
 
 class StadiumApp(QMainWindow):
@@ -72,6 +73,13 @@ class StadiumApp(QMainWindow):
         self.stacked.addWidget(screen)
         self.stacked.setCurrentWidget(screen)
 
+    def show_loading(self, players):
+        """Mostrar pantalla de carga/transición antes de la cámara."""
+        self._clear_stacked()
+        screen = LoadingScreen(self, players)
+        self.stacked.addWidget(screen)
+        self.stacked.setCurrentWidget(screen)
+
     def show_camera(self, players):
         """Mostrar pantalla de cámara."""
         self._clear_stacked()
@@ -99,8 +107,7 @@ class StadiumApp(QMainWindow):
         screen = FinalScreen(self, photo_path)
         self.stacked.addWidget(screen)
         self.stacked.setCurrentWidget(screen)
-        if qr_base64:
-            screen.set_final_image(photo_path, qr_base64)
+        screen.set_final_image(photo_path, qr_base64)
 
 
 def main():

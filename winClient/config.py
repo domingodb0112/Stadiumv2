@@ -18,10 +18,14 @@ BTN_DARK    = "#444444"
 
 # ── Rutas ─────────────────────────────────────────────────────────────────────
 ROOT       = Path(__file__).parent
-VIDEOS_DIR = Path("C:/Users/hecto/Documents/Miras Codes/StadiumV3Windows/app/src/main/assets")
-PHOTOS_DIR = Path("C:/Users/hecto/Documents/Miras Codes/StadiumV3Windows/photos")
+ASSETS_DIR = ROOT / "assets"
+VIDEOS_DIR = ASSETS_DIR / "videos"
+PHOTOS_DIR = ASSETS_DIR / "photos"
 OUTPUT_DIR = ROOT / "output"
-OUTPUT_DIR.mkdir(exist_ok=True)
+
+# Asegurar que existan los directorios
+for d in [VIDEOS_DIR, PHOTOS_DIR, OUTPUT_DIR]:
+    d.mkdir(parents=True, exist_ok=True)
 
 # Countdown de la cámara (segundos)
 COUNTDOWN_SEC = 5

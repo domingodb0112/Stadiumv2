@@ -1,0 +1,14 @@
+# Python
+__pycache__/
+*.pyc
+venv/
+.env
+
+# Project specific
+assets/videos/*
+assets/photos/*
+output/
+outputs/
+
+# EXCEPTIONS
+!assets/players.json

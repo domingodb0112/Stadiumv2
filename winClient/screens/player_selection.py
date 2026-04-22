@@ -356,4 +356,4 @@ class PlayerSelectionScreen(BaseScreen):
 
     def _on_continue(self):
         selected = [p for p in PLAYERS if p.selected]
-        self.app.show_camera(selected)
+        self.app.show_loading(selected)
