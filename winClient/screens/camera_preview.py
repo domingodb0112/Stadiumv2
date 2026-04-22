@@ -273,7 +273,7 @@ class CameraPreviewScreen(BaseScreen):
         scaled_pixmap = pixmap.scaled(
             self._canvas.size(),
             Qt.KeepAspectRatio,
-            Qt.SmoothTransformation,
+            Qt.FastTransformation,
         )
         self._canvas.setPixmap(scaled_pixmap)
         # Keep corner marks over canvas
