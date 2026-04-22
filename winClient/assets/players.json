@@ -5,8 +5,8 @@
     "image_name": "gilbertoMoraGm.png",
     "video_name": "gilbertoMora.mov",
     "slot": 3,
-    "x": 450,
-    "y": 700,
+    "x": 550,
+    "y": 800,
     "w": 540,
     "h": 1220
   },
@@ -16,7 +16,7 @@
     "image_name": "jorgeSanchezGm.png",
     "video_name": "jorgeSanchez.mov",
     "slot": 2,
-    "x": 600,
+    "x": 650,
     "y": 500,
     "w": 540,
     "h": 1220
@@ -27,8 +27,8 @@
     "image_name": "mateoChavezGm.png",
     "video_name": "mateoChavez.mov",
     "slot": 1,
-    "x": 0,
-    "y": 800,
+    "x": -100,
+    "y": 900,
     "w": 1080,
     "h": 1220
   },
@@ -38,8 +38,8 @@
     "image_name": "raulRangelGm.png",
     "video_name": "raulRangel.mov",
     "slot": 0,
-    "x": 0,
-    "y": 400,
+    "x": -100,
+    "y": 500,
     "w": 540,
     "h": 1440
   }
