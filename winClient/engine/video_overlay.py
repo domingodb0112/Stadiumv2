@@ -66,7 +66,7 @@ class VideoPlayer:
             return
 
         frame_dur = 1.0 / fps
-        idx = 0
+        self.idx = 0
         try:
             with open(path, 'rb') as f:
                 while self.running:
@@ -77,7 +77,7 @@ class VideoPlayer:
 
                     t0 = time.perf_counter()
 
-                    offset, size = frames[idx]
+                    offset, size = frames[self.idx]
                     f.seek(offset)
                     buf = f.read(size)
 
@@ -104,18 +104,20 @@ class VideoPlayer:
                             self.current_inv_alpha = inv_alpha
                             self.ready = True
 
-                    idx += 1
-                    if idx >= len(frames):
+                    self.idx += 1
+                    if self.idx >= len(frames):
                         if self.looping:
-                            idx = 0
+                            self.idx = 0
                         else:
                             self.finished = True
-                            # Congelar último frame hasta que nos detengan
+                            # Congelar último frame hasta que nos den 'Play' de nuevo o reset
                             while self.running and self.finished:
                                 time.sleep(0.1)
+                                if not self.finished: # Alguien nos reseteó desde fuera
+                                    break
+                            
                             if not self.running:
                                 break
-                            idx = 0
 
                     elapsed = time.perf_counter() - t0
                     sleep_t = frame_dur - elapsed
@@ -198,7 +200,8 @@ class VideoOverlayEngine:
                 # O simplemente usar el path que ya tiene si es válido
                 pass 
             
-            vp.current_frame = 0 # Reiniciar al inicio
+            vp.idx = 0 # Reiniciar al inicio real
+            vp.finished = False # Quitar estado de finalizado para que el hilo despierte
             vp.paused = paused
             
         print(f"[Engine] Experience reset and started for slots: {cls._active_slots}")
