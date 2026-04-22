@@ -28,7 +28,7 @@ class FinalScreen(QWidget):
     """Photo (top portion) + bottom panel with green dot, QR code, 'Volver al inicio' button."""
 
     # Fraction of window height occupied by bottom panel
-    _PANEL_RATIO = 0.28
+    _PANEL_RATIO = 0.35
 
     def __init__(self, main_window, photo_path=None):
         super().__init__()
@@ -69,7 +69,7 @@ class FinalScreen(QWidget):
             f"border-top: 1px solid rgba(0,0,0,30);"
         )
         panel_l = QVBoxLayout(self._panel)
-        panel_l.setAlignment(Qt.AlignCenter)
+        panel_l.setAlignment(Qt.AlignTop)
 
         # "Tu foto está lista" row
         ready_row = QHBoxLayout()
@@ -138,6 +138,8 @@ class FinalScreen(QWidget):
         self._btn.setCursor(Qt.PointingHandCursor)
         self._btn.clicked.connect(self._on_restart)
         panel_l.addWidget(self._btn)
+        
+        panel_l.addStretch()
 
         root.addWidget(self._panel)
         root.addWidget(GradientBar(height=4))
