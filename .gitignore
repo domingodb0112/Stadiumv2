@@ -1,0 +1,5 @@
+# Ignore everything in assets folder
+/winClient/assets/*
+
+# But include players.json
+!/winClient/assets/players.json
