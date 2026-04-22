@@ -247,8 +247,8 @@ class CameraPreviewScreen(BaseScreen):
             y_offset = (h - new_h) // 2
             frame = frame[y_offset : y_offset + new_h, :]
 
-        PREVIEW_W = 720
-        PREVIEW_H = 1280
+        PREVIEW_W = 540
+        PREVIEW_H = 960
 
         if not hasattr(self, "_last_res") or self._last_res != (PREVIEW_W, PREVIEW_H):
             VideoOverlayEngine.start_experience(self._players, PREVIEW_W, PREVIEW_H)

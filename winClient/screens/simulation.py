@@ -113,13 +113,13 @@ class ProcessingWorker(QObject):
 
     def run(self):
         try:
-            bg = np.zeros((REF_H, REF_W, 3), dtype=np.uint8)
-            cancha_path = PHOTOS_DIR / "cancha.png"
-            if cancha_path.exists():
-                cancha_img = cv2.imread(str(cancha_path))
-                if cancha_img is not None:
-                    bg = cv2.resize(cancha_img, (REF_W, REF_H))
+            # 1. Cargar fondo (Desde RAM Caché)
+            cancha_path = "assets/backgrounds/cancha.png"
+            cancha_img = VideoOverlayEngine.get_cached_image(cancha_path)
+            if cancha_img is not None:
+                bg = cv2.resize(cancha_img, (REF_W, REF_H))
             else:
+                bg = np.zeros((REF_H, REF_W, 3), dtype=np.uint8)
                 bg[:] = (0, 150, 0)
 
             # Procesar Usuario (CON OPTIMIZACIÓN DE CACHÉ)
@@ -146,14 +146,8 @@ class ProcessingWorker(QObject):
                 y_pos = REF_H - target_h
                 bg = _overlay_img(bg, user_final, x_pos, y_pos, target_w, target_h)
 
-            # 3. Superponer Jugadores
-            slots_order = {0: 0, 2: 1, 1: 2, 3: 3}
-            sorted_players = sorted(self._players, key=lambda p: slots_order.get(getattr(p, 'slot', 0), 99))
-            
-            for player in sorted_players:
-                p_img = _get_player_last_frame(player)
-                if p_img is not None:
-                    bg = _overlay_img(bg, p_img, player.x, player.y, player.w, player.h)
+            # 3. Superponer Jugadores (USANDO CACHE FINAL 1080p)
+            bg = VideoOverlayEngine.apply_all(bg, is_final=True)
 
             final_path = str(OUTPUT_DIR / f"result_{int(_t.time())}.jpg")
             cv2.imwrite(final_path, bg, [cv2.IMWRITE_JPEG_QUALITY, 95])

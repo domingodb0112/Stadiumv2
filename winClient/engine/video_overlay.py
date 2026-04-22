@@ -1,7 +1,6 @@
 """
-video_overlay.py - ULTRA OPTIMIZED FOR 32GB RAM
-Pre-calculates all blending math (pre-multiplied alpha and inverse masks) 
-during startup to ensure zero-lag preview.
+video_overlay.py - HYPER OPTIMIZED FOR 32GB RAM & LOW CPU
+Uses dual-cache (Preview/Final) to eliminate real-time resizing.
 """
 import threading
 import time
@@ -11,11 +10,17 @@ from engine.mov_parser import parse_mov
 
 
 class VideoPlayer:
-    """Maneja la reproducción de frames ULTRA-PRE-CALCULADOS en RAM."""
+    """Maneja la reproducción de frames pre-calculados en DUAL-CACHE (Preview/Final)."""
 
     def __init__(self):
-        self.current_fg_pre: np.ndarray | None = None
-        self.current_inv_alpha: np.ndarray | None = None
+        # Cache para el Preview (720p)
+        self.curr_fg_pre_pv: np.ndarray | None = None
+        self.curr_inv_pv: np.ndarray | None = None
+        
+        # Cache para la Foto Final (1080p)
+        self.curr_fg_pre_final: np.ndarray | None = None
+        self.curr_inv_final: np.ndarray | None = None
+
         self.lock          = threading.Lock()
         self.running       = False
         self.ready         = False
@@ -23,7 +28,8 @@ class VideoPlayer:
         self.looping       = False
         self.paused        = False
         self._thread: threading.Thread | None = None
-        self.config        = (0, 0, 540, 960)
+        self.config_pv     = (0, 0, 0, 0)
+        self.config_final  = (0, 0, 0, 0)
         self.idx           = 0
 
     def start(self, path: str, looping: bool = False):
@@ -38,38 +44,36 @@ class VideoPlayer:
     def stop(self):
         self.running = False
         if self._thread and self._thread.is_alive():
-            self._thread.join(timeout=1.0)
+            self._thread.join(timeout=0.5)
         self._thread = None
 
     def _loop(self, path: str):
         if path not in VideoOverlayEngine._video_cache:
-            print(f"[!] Critical: {path} not pre-calculated.")
             self.running = False
             return
             
-        # Obtener los datos pre-calculados (Rayos X de velocidad)
-        frames_pre_data, fps = VideoOverlayEngine._video_cache[path]
+        dual_cache_data, fps = VideoOverlayEngine._video_cache[path]
         frame_dur = 1.0 / fps
         self.idx = 0
         
         while self.running:
             if self.paused and self.ready:
-                time.sleep(0.02)
+                time.sleep(0.01)
                 continue
 
             t0 = time.perf_counter()
 
-            # EXTRAER DATA PRE-CALCULADA (Cero cálculos aquí)
-            if self.idx < len(frames_pre_data):
-                fg_pre, inv_alpha = frames_pre_data[self.idx]
+            if self.idx < len(dual_cache_data):
+                # Extraer ambos sets de datos (Preview y Final)
+                pv_data, final_data = dual_cache_data[self.idx]
                 
                 with self.lock:
-                    self.current_fg_pre    = fg_pre
-                    self.current_inv_alpha = inv_alpha
+                    self.curr_fg_pre_pv, self.curr_inv_pv = pv_data
+                    self.curr_fg_pre_final, self.curr_inv_final = final_data
                     self.ready = True
 
             self.idx += 1
-            if self.idx >= len(frames_pre_data):
+            if self.idx >= len(dual_cache_data):
                 if self.looping:
                     self.idx = 0
                 else:
@@ -86,26 +90,43 @@ class VideoPlayer:
 
 
 class VideoOverlayEngine:
-    """Motor con Caché Agresiva que pre-calcula la matemática de mezcla."""
+    """Motor con Súper-Caché que elimina el uso de Disco y CPU durante la sesión."""
 
     _players: list[VideoPlayer] = [VideoPlayer() for _ in range(4)]
-    _video_cache: dict[str, tuple] = {} # Path -> (list[(fg_pre, inv_alpha)], fps)
+    _video_cache: dict[str, tuple] = {} 
+    _img_cache: dict[str, np.ndarray] = {} # Caché para fondos y logos
     _active_slots: list[int] = []
 
     @classmethod
+    def get_cached_image(cls, path: str):
+        """Devuelve una imagen desde la RAM, leyéndola del disco solo la primera vez."""
+        if path not in cls._img_cache:
+            img = cv2.imread(path, cv2.IMREAD_UNCHANGED)
+            if img is not None:
+                cls._img_cache[path] = img
+        return cls._img_cache.get(path)
+
+    @classmethod
     def preload_all_videos(cls, player_data_list):
-        """Pre-calcula la mezcla de todos los videos y los sube a RAM."""
+        """Pre-calcula versiones duales para evitar cualquier resize en tiempo real."""
         import os
+        from config import REF_W, REF_H
+        # Escala para el preview (540p - ULTRA FLUIDO)
+        PV_SCALE_W = 540 / REF_W
+        PV_SCALE_H = 960 / REF_H
+
         for p in player_data_list:
             path = f"assets/videos/{p['video_name']}"
             if path not in cls._video_cache and os.path.exists(path):
-                print(f"[Engine] ULTRA-PRE-CALCULATING {path}...")
+                print(f"[Engine] HYPER-CACHING {path}...")
                 frames_meta, fps = parse_mov(path)
                 
-                # Configurar tamaño de pre-calculado basado en el JSON (o estándar)
-                target_w, target_h = p['w'], p['h']
+                # Tamaño Final (1080p)
+                fw, fh = p['w'], p['h']
+                # Tamaño Preview (720p)
+                pw, ph = int(fw * PV_SCALE_W), int(fh * PV_SCALE_H)
                 
-                pre_calculated_data = []
+                dual_data = []
                 with open(path, 'rb') as f:
                     for offset, size in frames_meta:
                         f.seek(offset)
@@ -114,41 +135,42 @@ class VideoOverlayEngine:
                         img = cv2.imdecode(arr, cv2.IMREAD_UNCHANGED)
                         
                         if img is not None:
-                            # 1. Escalar al tamaño final de una vez para no escalar en el preview
-                            img = cv2.resize(img, (target_w, target_h), interpolation=cv2.INTER_LINEAR)
+                            # --- PREPARAR VERSIÓN PREVIEW (720p) ---
+                            img_pv = cv2.resize(img, (pw, ph), interpolation=cv2.INTER_LINEAR)
+                            a_pv  = img_pv[:, :, 3:4].astype(np.uint16)
+                            rgb_pv = img_pv[:, :, :3].astype(np.uint16)
+                            pv_entry = ((rgb_pv * a_pv).astype(np.uint32), (255 - a_pv).astype(np.uint32))
                             
-                            # 2. Pre-calcular matemática de mezcla
-                            alpha  = img[:, :, 3:4].astype(np.uint16)
-                            fg_rgb = img[:, :, :3].astype(np.uint16)
+                            # --- PREPARAR VERSIÓN FINAL (1080p) ---
+                            img_final = cv2.resize(img, (fw, fh), interpolation=cv2.INTER_LINEAR)
+                            a_f  = img_final[:, :, 3:4].astype(np.uint16)
+                            rgb_f = img_final[:, :, :3].astype(np.uint16)
+                            f_entry = ((rgb_f * a_f).astype(np.uint32), (255 - a_f).astype(np.uint32))
                             
-                            # fg_pre: 0 - 65025 (uint32 para el cálculo final)
-                            fg_pre    = (fg_rgb * alpha).astype(np.uint32)
-                            # inv_alpha: 0 - 255 (uint32 para el cálculo final)
-                            inv_alpha = (255 - alpha).astype(np.uint32)
-                            
-                            pre_calculated_data.append((fg_pre, inv_alpha))
+                            dual_data.append((pv_entry, f_entry))
                 
-                cls._video_cache[path] = (pre_calculated_data, fps)
-                print(f"[Engine] {path} optimized and ready in RAM.")
-
-    @classmethod
-    def set_paused(cls, paused: bool):
-        for vp in cls._players: vp.paused = paused
+                cls._video_cache[path] = (dual_data, fps)
+                print(f"[Engine] {path} dual-cached.")
 
     @classmethod
     def warm_up(cls, player_data_list, screen_w, screen_h):
-        """Prepara todo para que el inicio sea instantáneo después del arranque."""
         cls.preload_all_videos(player_data_list)
+        # Pre-cargar fondos comunes
+        cls.get_cached_image("assets/backgrounds/cancha.png")
+        
         for p_data in player_data_list:
             slot = p_data.get("slot", 0)
             vp = cls._players[slot]
             from config import REF_W, REF_H
-            # Coordenadas finales
-            x = int(p_data['x'] * screen_w / REF_W)
-            y = int(p_data['y'] * screen_h / REF_H)
-            w = int(p_data['w'] * screen_w / REF_W)
-            h = int(p_data['h'] * screen_h / REF_H)
-            vp.config = (x, y, w, h)
+            # Configurar ambas escalas
+            vp.config_pv = (
+                int(p_data['x'] * 540 / REF_W),
+                int(p_data['y'] * 960 / REF_H),
+                int(p_data['w'] * 540 / REF_W),
+                int(p_data['h'] * 960 / REF_H)
+            )
+            vp.config_final = (p_data['x'], p_data['y'], p_data['w'], p_data['h'])
+            
             vp.paused = True
             path = f"assets/videos/{p_data['video_name']}"
             vp.start(path, looping=False)
@@ -163,58 +185,40 @@ class VideoOverlayEngine:
             vp.paused = paused
 
     @classmethod
-    def apply_all(cls, frame_bgr: np.ndarray) -> np.ndarray:
-        """Mezcla ultra veloz usando datos pre-calculados."""
+    def apply_all(cls, frame_bgr: np.ndarray, is_final=False) -> np.ndarray:
+        """Mezcla ultra veloz. Detecta automáticamente si es preview o foto final."""
         fh, fw = frame_bgr.shape[:2]
         
-        # Orden de capas 0, 2 -> 1, 3
         for slot in [0, 2, 1, 3]:
             if slot not in cls._active_slots: continue
             vp = cls._players[slot]
             if not vp.ready: continue
             
             with vp.lock:
-                fg_pre = vp.current_fg_pre
-                inv_alpha = vp.current_inv_alpha
+                if is_final:
+                    fg_pre, inv_a = vp.curr_fg_pre_final, vp.curr_inv_final
+                    x, y, w, h = vp.config_final
+                else:
+                    fg_pre, inv_a = vp.curr_fg_pre_pv, vp.curr_inv_pv
+                    x, y, w, h = vp.config_pv
             
-            if fg_pre is None or inv_alpha is None: continue
+            if fg_pre is None: continue
             
-            x, y, w, h = vp.config
-            
-            # Recorte de seguridad
             x1, y1 = max(x, 0), max(y, 0)
             x2, y2 = min(x + w, fw), min(y + h, fh)
             if x1 >= x2 or y1 >= y2: continue
 
             try:
-                # El pre-calculado ya tiene el tamaño w,h del JSON
-                # Si el preview es a otra escala (720p), redimensionamos el cache solo si es necesario
-                # Pero en warm_up intentamos que ya venga listo.
-                if fg_pre.shape[1] != w or fg_pre.shape[0] != h:
-                    # Esto solo pasaría si el preview cambia de tamaño dinámicamente
-                    fg_pre = cv2.resize(fg_pre, (w, h), interpolation=cv2.INTER_NEAREST)
-                    inv_alpha = cv2.resize(inv_alpha, (w, h), interpolation=cv2.INTER_NEAREST)
-
                 ox1, oy1 = x1 - x, y1 - y
                 ox2, oy2 = x2 - x, y2 - y
                 
-                f_roi = fg_pre[oy1:oy2, ox1:ox2]
-                i_roi = inv_alpha[oy1:oy2, ox1:ox2]
-                b_roi = frame_bgr[y1:y2, x1:x2]
-                
-                # FORMULA ULTRA: (Fondo * Máscara_Inversa + Frente_Precalculado) / 255
-                # Todo esto ya es uint32, no hay conversiones costosas en el loop
-                tmp = b_roi.astype(np.uint32) * i_roi + f_roi
+                # LA MAGIA: Cero resize, cero conversiones. Solo sumar y pintar.
+                tmp = frame_bgr[y1:y2, x1:x2].astype(np.uint32) * inv_a[oy1:oy2, ox1:ox2] + fg_pre[oy1:oy2, ox1:ox2]
                 frame_bgr[y1:y2, x1:x2] = (tmp // 255).astype(np.uint8)
-            except:
-                pass
+            except: pass
                 
         return frame_bgr
 
     @classmethod
     def stop_all(cls):
         for vp in cls._players: vp.stop()
-
-    @classmethod
-    def all_finished(cls) -> bool:
-        return all(vp.finished or not vp.running for vp in cls._players)

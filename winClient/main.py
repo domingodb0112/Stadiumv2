@@ -3,7 +3,12 @@ Stadium Photo Booth - Windows Client (PyQt5)
 Main app controller
 """
 import sys
+import os
 import threading
+
+# OPTIMIZACIÓN: Evitar que Windows se quede colgado escaneando la cámara (Media Foundation)
+os.environ["OPENCV_VIDEOIO_PRIORITY_MSMF"] = "0"
+
 import cv2
 from pathlib import Path
 
@@ -63,12 +68,14 @@ class StadiumApp(QMainWindow):
 
     def _preload_assets(self):
         try:
-            # La cámara ya está inicializada desde main()
+            # 1. Encender cámara en background (asíncrono)
+            from camera_manager import CameraManager
+            CameraManager.get_cap()
             
-            # Cargar y PRE-CALENTAR todos los videos
+            # 2. Cargar y PRE-CALENTAR todos los videos
             with open("assets/players.json", "r", encoding="utf-8") as f:
                 players_data = json.load(f)
-                # Calentar a 1280x720 (resolución típica de preview)
+                # Calentar usando el modo Dual-Cache
                 VideoOverlayEngine.warm_up(players_data, 720, 1280)
         except Exception as e:
             print(f"[Main] Preload error: {e}")
@@ -139,13 +146,12 @@ class StadiumApp(QMainWindow):
 def main():
     app = QApplication(sys.argv)
     
-    # 1. LO PRIMERO: Encender cámara (bloqueante al inicio para seguridad)
-    from camera_manager import CameraManager
-    CameraManager.get_cap()
-    
-    # 2. Iniciar App
+    # Iniciar App de inmediato (Cero esperas)
     window = StadiumApp()
     window.show()
+    
+    # La cámara se encenderá en background cuando StadiumApp llame a _preload_assets
+    
     sys.exit(app.exec_())
 
 
