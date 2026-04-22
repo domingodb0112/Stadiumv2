@@ -222,3 +222,12 @@ class VideoOverlayEngine:
     @classmethod
     def stop_all(cls):
         for vp in cls._players: vp.stop()
+
+    @classmethod
+    def set_paused(cls, paused: bool):
+        for vp in cls._players:
+            vp.paused = paused
+
+    @classmethod
+    def all_finished(cls) -> bool:
+        return all(vp.finished or not vp.running for vp in cls._players)
