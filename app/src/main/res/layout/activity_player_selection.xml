@@ -1,10 +1,11 @@
 <?xml version="1.0" encoding="utf-8"?>
 <LinearLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
     android:orientation="vertical"
-    android:background="#FF000000"
+    android:background="@color/surface_dark"
     android:gravity="center_horizontal">
 
     <!-- Header -->
@@ -13,7 +14,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="48dp"
         android:text="ELIGE TUS JUGADORES"
-        android:textColor="#FFFFFFFF"
+        android:textColor="@color/text_primary"
         android:textSize="22sp"
         android:fontFamily="sans-serif-black"
         android:letterSpacing="0.08" />
@@ -23,7 +24,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="6dp"
         android:text="Selecciona los jugadores que aparecerán en tu foto"
-        android:textColor="#88FFFFFF"
+        android:textColor="@color/text_secondary"
         android:textSize="13sp"
         android:gravity="center"
         android:paddingHorizontal="24dp" />
@@ -34,7 +35,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:text="0 seleccionados"
-        android:textColor="#FF4CAF50"
+        android:textColor="@color/brand_green"
         android:textSize="14sp"
         android:fontFamily="sans-serif-medium" />
 
@@ -57,10 +58,13 @@
         android:layout_marginTop="12dp"
         android:text="CONTINUAR"
         android:textSize="16sp"
-        android:textColor="#FF000000"
+        android:textColor="@color/black"
         android:enabled="false"
-        android:backgroundTint="#FF4CAF50"
+        android:backgroundTint="@color/brand_green"
         android:fontFamily="sans-serif-black"
-        android:letterSpacing="0.08" />
+        android:letterSpacing="0.08"
+        android:insetTop="0dp"
+        android:insetBottom="0dp"
+        app:cornerRadius="8dp" />
 
 </LinearLayout>
