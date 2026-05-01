@@ -4,7 +4,7 @@
     xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="@color/surface_dark">
 
     <!-- Foto capturada a pantalla completa -->
     <ImageView
@@ -14,7 +14,7 @@
         android:scaleType="fitCenter"
         android:contentDescription="Foto final" />
 
-    <!-- Gradiente superior para legibilidad del texto (no tapa la animación) -->
+    <!-- Gradiente superior para legibilidad del texto -->
     <View
         android:layout_width="match_parent"
         android:layout_height="220dp"
@@ -43,7 +43,7 @@
             android:layout_width="wrap_content"
             android:layout_height="wrap_content"
             android:text="✓"
-            android:textColor="#FF4CAF50"
+            android:textColor="@color/brand_green"
             android:textSize="120sp"
             android:fontFamily="sans-serif-black"
             android:alpha="0" />
@@ -55,7 +55,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="16dp"
             android:text="¡Foto lista!"
-            android:textColor="#FFFFFFFF"
+            android:textColor="@color/text_primary"
             android:textSize="48sp"
             android:fontFamily="sans-serif-black"
             android:gravity="center"
@@ -68,7 +68,7 @@
             android:layout_height="wrap_content"
             android:layout_marginTop="12dp"
             android:text="Revisa tu foto en la aplicación"
-            android:textColor="#CCFFFFFF"
+            android:textColor="@color/text_secondary"
             android:textSize="22sp"
             android:gravity="center"
             android:alpha="0" />
@@ -79,7 +79,7 @@
             android:layout_width="240dp"
             android:layout_height="240dp"
             android:layout_marginTop="24dp"
-            android:background="#FFFFFF"
+            android:background="@color/white"
             android:padding="8dp"
             android:visibility="gone">
 
@@ -93,7 +93,7 @@
 
     </LinearLayout>
 
-    <!-- Botón Volver al inicio (Permanente) -->
+    <!-- Botón Volver al inicio -->
     <LinearLayout
         android:layout_width="match_parent"
         android:layout_height="wrap_content"
@@ -106,16 +106,15 @@
         <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_back_to_home"
             android:layout_width="280dp"
-            android:layout_height="72dp"
+            android:layout_height="64dp"
             android:text="VOLVER AL INICIO"
-            android:textColor="#FFFFFF"
-            android:textSize="20sp"
+            android:textColor="@color/black"
+            android:textSize="18sp"
             android:fontFamily="sans-serif-black"
-            android:backgroundTint="#FF4CAF50"
-            style="@style/Widget.MaterialComponents.Button"
+            android:backgroundTint="@color/brand_green"
             android:insetTop="0dp"
             android:insetBottom="0dp"
-            app:cornerRadius="36dp" />
+            app:cornerRadius="8dp" />
 
     </LinearLayout>
 

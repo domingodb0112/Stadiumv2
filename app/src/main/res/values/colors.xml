@@ -1,0 +1,20 @@
+<?xml version="1.0" encoding="utf-8"?>
+<resources>
+    <!-- Brand palette -->
+    <color name="brand_green">#FF00C45C</color>
+    <color name="brand_green_dark">#FF00A44E</color>
+    <color name="brand_green_tint">#2600C45C</color>
+
+    <!-- Surfaces -->
+    <color name="surface_dark">#FF0A1A0E</color>
+    <color name="surface_darker">#FF061208</color>
+
+    <!-- Text -->
+    <color name="text_primary">#FFFFFFFF</color>
+    <color name="text_secondary">#99FFFFFF</color>
+    <color name="text_disabled">#44FFFFFF</color>
+
+    <!-- Utility -->
+    <color name="black">#FF000000</color>
+    <color name="white">#FFFFFFFF</color>
+</resources>

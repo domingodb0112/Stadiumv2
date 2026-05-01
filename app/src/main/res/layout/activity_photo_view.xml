@@ -1,9 +1,10 @@
 <?xml version="1.0" encoding="utf-8"?>
 <FrameLayout
     xmlns:android="http://schemas.android.com/apk/res/android"
+    xmlns:app="http://schemas.android.com/apk/res-auto"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000">
+    android:background="@color/surface_dark">
 
     <!-- Foto capturada a pantalla completa -->
     <ImageView
@@ -23,27 +24,37 @@
         android:layout_marginBottom="48dp"
         android:paddingHorizontal="32dp">
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_retake"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="56dp"
             android:layout_weight="1"
             android:layout_marginEnd="12dp"
             android:text="Reintentar"
-            android:textSize="20sp"
-            android:background="#FF444444"
-            android:textColor="#FFFFFFFF" />
+            android:textSize="16sp"
+            android:textColor="@color/text_primary"
+            android:backgroundTint="@color/surface_darker"
+            android:fontFamily="sans-serif-medium"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:cornerRadius="8dp"
+            app:strokeColor="@color/text_disabled"
+            app:strokeWidth="1dp" />
 
-        <Button
+        <com.google.android.material.button.MaterialButton
             android:id="@+id/btn_send"
             android:layout_width="0dp"
-            android:layout_height="64dp"
+            android:layout_height="56dp"
             android:layout_weight="1"
             android:layout_marginStart="12dp"
             android:text="Enviar foto"
-            android:textSize="20sp"
-            android:background="#FF1976D2"
-            android:textColor="#FFFFFFFF" />
+            android:textSize="16sp"
+            android:textColor="@color/black"
+            android:backgroundTint="@color/brand_green"
+            android:fontFamily="sans-serif-black"
+            android:insetTop="0dp"
+            android:insetBottom="0dp"
+            app:cornerRadius="8dp" />
 
     </LinearLayout>
 

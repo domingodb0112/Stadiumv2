@@ -3,7 +3,7 @@
     xmlns:android="http://schemas.android.com/apk/res/android"
     android:layout_width="match_parent"
     android:layout_height="match_parent"
-    android:background="#000000"
+    android:background="@color/surface_dark"
     android:orientation="vertical"
     android:gravity="center"
     android:padding="40dp">
@@ -12,7 +12,7 @@
         android:layout_width="wrap_content"
         android:layout_height="wrap_content"
         android:text="¡SALIENDO AL CAMPO!"
-        android:textColor="#FF4CAF50"
+        android:textColor="@color/brand_green"
         android:textSize="28sp"
         android:fontFamily="sans-serif-black"
         android:letterSpacing="0.05"
@@ -24,7 +24,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="20dp"
         android:text="Tus ídolos están saltando al césped...\nPreparando el encuentro histórico."
-        android:textColor="#FFFFFF"
+        android:textColor="@color/text_primary"
         android:textSize="18sp"
         android:gravity="center"
         android:lineSpacingExtra="4dp" />
@@ -35,7 +35,8 @@
         android:layout_width="match_parent"
         android:layout_height="8dp"
         android:layout_marginTop="48dp"
-        android:progressDrawable="@android:drawable/progress_horizontal"
+        android:progressTint="@color/brand_green"
+        android:progressBackgroundTint="@color/surface_darker"
         android:progress="0"
         android:max="6000" />
 
@@ -45,7 +46,7 @@
         android:layout_height="wrap_content"
         android:layout_marginTop="12dp"
         android:text="6 segundos para la gloria..."
-        android:textColor="#66FFFFFF"
+        android:textColor="@color/text_disabled"
         android:textSize="12sp"
         android:fontFamily="sans-serif-light" />
 
